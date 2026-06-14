@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import {
   BasketTier,
@@ -9,7 +9,6 @@ import {
   Order,
   PaymentMethod,
   Product,
-  SmartBundle,
   TierName,
 } from '@/lib/types';
 import {
@@ -27,7 +26,7 @@ import {
   toCheckoutItems,
 } from '@/lib/bundle';
 import { IntentBar } from '@/components/IntentBar';
-import { SmartBundlesGrid } from '@/components/SmartBundlesGrid';
+import { Homepage } from '@/components/homepage/Homepage';
 import { TierBaskets } from '@/components/TierBaskets';
 import { CategoryGrid } from '@/components/CategoryGrid';
 import { CartSummary } from '@/components/CartSummary';
@@ -55,7 +54,6 @@ export default function HomePage() {
   const [screen, setScreen] = useState<Screen>('hub');
   const [mode, setMode] = useState<Mode>('quick');
   const [intentText, setIntentText] = useState('');
-  const [smartBundles, setSmartBundles] = useState<SmartBundle[]>([]);
 
   const [submittedIntent, setSubmittedIntent] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
@@ -72,13 +70,6 @@ export default function HomePage() {
   const [showPayment, setShowPayment] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
-
-  useEffect(() => {
-    api
-      .listSmartBundles()
-      .then((r) => setSmartBundles(r.smartBundles))
-      .catch(() => setSmartBundles([]));
-  }, []);
 
   // ---- Load shopping data for an intent in the current mode ----
   const loadQuick = useCallback(async (intent: string, knownCategories?: string[]) => {
@@ -336,9 +327,9 @@ export default function HomePage() {
       )}
 
       {screen === 'hub' && (
-        <main className="mx-auto max-w-2xl px-4">
-          <section className="flex min-h-screen flex-col justify-center py-12">
-            <div className="mb-8 flex flex-col items-center gap-3">
+        <main className="mx-auto max-w-2xl px-4 pb-16">
+          <section className="pt-8">
+            <div className="mb-6 flex flex-col items-center gap-3">
               {mode === 'flash' && (
                 <div className="flex items-center gap-2 text-red-600">
                   <BoltIcon className="flash-bolt h-7 w-7" />
@@ -358,9 +349,12 @@ export default function HomePage() {
               onError={setError}
               disabled={!!loadingMsg}
             />
-            <SmartBundlesGrid
-              bundles={smartBundles}
-              onSelect={handleSmartBundle}
+          </section>
+
+          <section className="mt-10">
+            <Homepage
+              onIntent={submitIntent}
+              onBundle={handleSmartBundle}
               disabled={!!loadingMsg}
             />
           </section>

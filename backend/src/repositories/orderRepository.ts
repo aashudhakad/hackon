@@ -38,4 +38,18 @@ export const orderRepository = {
     }
     return memoryOrders.get(id) ?? null;
   },
+
+  /**
+   * Returns the most recent orders (newest first). Used as a behavior signal
+   * for homepage personalization and trending analytics. There is no per-user
+   * field on orders yet, so this returns global recent orders.
+   */
+  async recent(limit = 20): Promise<Order[]> {
+    if (isMongoConnected()) {
+      return OrderModel.find().sort({ createdAt: -1 }).limit(limit).lean<Order[]>().exec();
+    }
+    return Array.from(memoryOrders.values())
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .slice(0, limit);
+  },
 };

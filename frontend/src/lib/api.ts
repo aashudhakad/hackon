@@ -1,4 +1,4 @@
-import { BasketTier, Bundle, CategoryRow, Order, Product, SmartBundle, StructuredIntent, TierName } from './types';
+import { BasketTier, Bundle, CategoryRow, HomepageFull, Order, Product, SmartBundle, StructuredIntent, TierName } from './types';
 
 /**
  * Thin API client. All calls go through Next's `/api/*` rewrite, which proxies
@@ -96,6 +96,18 @@ export const api = {
 
   listSmartBundles() {
     return request<{ smartBundles: SmartBundle[] }>('/api/smart-bundles');
+  },
+
+  /** Homepage module: personalized + trending + smart bundles in one call. */
+  homepageFull(params: { lat?: number; lon?: number; pincode?: string; userId?: string; tz?: number }) {
+    const qs = new URLSearchParams();
+    if (typeof params.lat === 'number') qs.set('lat', String(params.lat));
+    if (typeof params.lon === 'number') qs.set('lon', String(params.lon));
+    if (params.pincode) qs.set('pincode', params.pincode);
+    if (params.userId) qs.set('userId', params.userId);
+    if (typeof params.tz === 'number') qs.set('tz', String(params.tz));
+    const q = qs.toString();
+    return request<HomepageFull>(`/api/homepage/full${q ? `?${q}` : ''}`);
   },
 
   getSmartBundle(id: string) {

@@ -97,3 +97,36 @@ export interface ApiErrorShape {
   message: string;
   rawText?: string;
 }
+
+// ---- Homepage module ----
+
+export interface HomepageIntent {
+  id: string;
+  title: string;
+  query: string;
+  emoji?: string;
+  source: 'personalized' | 'trending';
+  confidence?: number;
+  reason?: string;
+}
+
+export interface WeatherInfo {
+  tempC: number | null;
+  condition: string;
+  bucket: 'hot' | 'cold' | 'rainy' | 'pleasant' | 'unknown';
+}
+
+export interface HomepageContext {
+  timeBucket: 'morning' | 'afternoon' | 'evening' | 'night';
+  dayOfWeek: string;
+  isWeekend: boolean;
+  season: 'summer' | 'monsoon' | 'autumn' | 'winter';
+  weather: WeatherInfo;
+  location: { pincode?: string; lat?: number; lon?: number } | null;
+}
+
+export interface HomepageFull {
+  personalized: { intents: HomepageIntent[]; context: HomepageContext; cached: boolean };
+  trending: { intents: HomepageIntent[]; cached: boolean };
+  smartBundles: { smartBundles: SmartBundle[]; cached: boolean };
+}

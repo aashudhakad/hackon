@@ -16,6 +16,12 @@ import { processAudioIntent } from '../controllers/audioIntentController';
 import { getSmartBundle, listSmartBundles } from '../controllers/smartBundleController';
 import { getCrossSell } from '../controllers/crossSellController';
 import { checkout } from '../controllers/checkoutController';
+import {
+  getHomepageFull,
+  getHomepageSmartBundles,
+  getPersonalized,
+  getTrending,
+} from '../controllers/homepageController';
 
 /** Mounts all API routes under /api. */
 export const apiRouter = Router();
@@ -35,6 +41,12 @@ apiRouter.post('/audio-intent', audioUpload.single('audio'), asyncHandler(proces
 // Smart bundles
 apiRouter.get('/smart-bundles', asyncHandler(listSmartBundles));
 apiRouter.get('/smart-bundles/:id', asyncHandler(getSmartBundle));
+
+// Homepage module (Personalized / Trending / Smart Bundles)
+apiRouter.get('/homepage/personalized', asyncHandler(getPersonalized));
+apiRouter.get('/homepage/trending', asyncHandler(getTrending));
+apiRouter.get('/homepage/smart-bundles', asyncHandler(getHomepageSmartBundles));
+apiRouter.get('/homepage/full', asyncHandler(getHomepageFull));
 
 // Cross-sell + checkout
 apiRouter.post('/cross-sell', validateBody(crossSellSchema), asyncHandler(getCrossSell));

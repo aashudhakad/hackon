@@ -62,11 +62,22 @@ export function sanitizeCategories(raw: unknown): string[] {
 
 /** Calls the Gemini generateContent REST endpoint and returns parsed categories. */
 async function callGemini(intent: string): Promise<string[]> {
+  const parsed = await callGeminiJSON(buildPrompt(intent));
+  const categories =
+    Array.isArray(parsed) ? parsed : (parsed as { categories?: unknown }).categories;
+  return sanitizeCategories(categories);
+}
+
+/**
+ * Generic Gemini call returning parsed JSON. Shared by the category extractor
+ * and the homepage personalization service. Throws if Gemini is unreachable.
+ */
+export async function callGeminiJSON(prompt: string): Promise<unknown> {
   const url =
     `${env.gemini.baseUrl}/models/${env.gemini.model}:generateContent?key=${env.gemini.apiKey}`;
 
   const body = {
-    contents: [{ role: 'user', parts: [{ text: buildPrompt(intent) }] }],
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: 0,
       responseMimeType: 'application/json',
@@ -92,18 +103,13 @@ async function callGemini(intent: string): Promise<string[]> {
   };
   const textOut = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(textOut);
+    return JSON.parse(textOut);
   } catch {
     // Model occasionally wraps JSON in prose/fences; extract the first {...} or [...].
     const match = textOut.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    parsed = match ? JSON.parse(match[0]) : {};
+    return match ? JSON.parse(match[0]) : {};
   }
-
-  const categories =
-    Array.isArray(parsed) ? parsed : (parsed as { categories?: unknown }).categories;
-  return sanitizeCategories(categories);
 }
 
 /**
