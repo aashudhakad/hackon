@@ -19,26 +19,79 @@ const REQUEST_TIMEOUT_MS = 12_000;
 /** Builds the AI-friendly prompt combining the intent with the category list. */
 function buildPrompt(intent: string): string {
   return [
-    'You are the shopping-intent engine for "Amazon Instant Engine", an intent-first',
-    'shopping app. Instead of searching for products, the user states an OUTCOME they',
-    'want to achieve (a goal, recipe, situation, or need). Your job is to decompose that',
-    'intent into the product CATEGORIES required to fulfil it.',
+    'You are the Intent Decomposer for an intent-first quick-commerce app.',
+    'Your job is to convert a user intent into the SMALLEST PRACTICAL set of product categories needed to fulfill that intent immediately.',
     '',
-    'The user intent may be written in ANY language (English, Hindi, Hinglish, etc.).',
-    'Understand the meaning regardless of language.',
+    'IMPORTANT: PRECISION > RECALL.',
+    'Return fewer categories if needed. Do NOT pad the list.',
+    'Do NOT return semantically adjacent or keyword-matching categories unless they are truly required.',
+    '',
+    'The user intent may be in any language: English, Hindi, Hinglish, or mixed.',
+    'Understand the meaning, not just the words.',
     '',
     'You may ONLY choose categories from this exact list (snake_case keys):',
     JSON.stringify(KNOWN_CATEGORIES),
     '',
-    'Rules:',
-    '1. Return ONLY categories that are genuinely needed for the intent.',
-    '2. Use the EXACT category keys from the list above. Do not invent new keys.',
-    '3. Order the categories by importance (most essential first).',
-    '4. Return between 1 and 12 categories. Prefer the most relevant ones.',
-    '5. If the intent is a recipe or dish, include its key ingredients that exist in the list.',
-    '6. If nothing in the list is relevant, return an empty array.',
+    'Classify the intent internally before answering:',
+    '- recipe / cooking',
+    '- restock / staples',
+    '- event / entertainment',
+    '- travel / commute',
+    '- home / hostel / new setup',
+    '- office / study',
+    '- health / recovery',
+    '- baby / family',
+    '- seasonal / weather-based',
+    '- gift / celebration',
+    '- emergency / urgent need',
+    '- general lifestyle need',
     '',
-    'Respond with STRICT JSON in exactly this shape, and nothing else:',
+    'Decision rules:',
+    '1. Return only categories a real person would actually buy for this situation.',
+    '2. Exclude irrelevant but keyword-similar categories.',
+    '3. Exclude accessories, toys, beauty items, gadgets, or variants that merely contain a matching word.',
+    '4. If the intent is narrow, return fewer categories.',
+    '5. If the intent is broad, return a balanced set, usually 3 to 8 categories.',
+    '6. Never return decorative, optional, or low-priority categories unless the user explicitly asks for them.',
+    '7. Order categories by necessity: most essential first.',
+    '8. If nothing in the list is relevant, return an empty array.',
+    '',
+    'Special rules by intent type:',
+    '',
+    'A) Recipe / cooking intent:',
+    '- Return the core ingredients and essential prep items only.',
+    '- Usually 3 to 7 categories.',
+    '- Include the main ingredient plus only the most necessary supporting ingredients.',
+    '- Do NOT include garnish, decorative items, or exhaustive pantry items.',
+    '- Do NOT return just the main ingredient if the dish clearly needs supporting ingredients.',
+    '',
+    'Examples:',
+    '- "Paneer bhurji" should include categories like paneer, onion, tomato, green chilli, cooking oil/butter, and only the most essential spices if present in the catalog.',
+    '- Do NOT return unrelated categories like hair oil, shampoo, or toys just because a word matches.',
+    '',
+    'B) Restock / staples intent:',
+    '- Return only practical replenishment items that match the user’s stated need.',
+    '- Focus on everyday essentials, not premium extras.',
+    '',
+    'C) Event / entertainment intent:',
+    '- Return consumables and immediate-use items only.',
+    '- Example: movie night => snacks, cold drinks, popcorn, chocolate, paper plates if relevant.',
+    '- Do NOT return TV, speakers, sofa, or similar unrelated products.',
+    '',
+    'D) Travel / office / home / hostel / emergency intent:',
+    '- Return starter essentials and immediate-use items only.',
+    '- Think like a human shopping quickly for the situation.',
+    '',
+    'E) Health / recovery intent:',
+    '- Return comfort, hydration, and basic relief items only, if they exist in the category list.',
+    '',
+    'F) Vague intent:',
+    '- Infer the most likely practical shopping goal from context, but stay conservative.',
+    '- Prefer a smaller accurate set over a broad noisy set.',
+    '',
+    'Strict output format:',
+    'Return STRICT JSON only, and nothing else.',
+    'Use this exact shape:',
     '{ "categories": ["category_key_1", "category_key_2"] }',
     '',
     `User intent: """${intent}"""`,
@@ -141,7 +194,11 @@ export async function generateCategoriesForIntent(intent: string): Promise<strin
   if (env.geminiEnabled) {
     try {
       const categories = await callGemini(trimmed);
-      if (categories.length > 0) return categories;
+      if (categories.length > 0) {
+        logger.info('[Gemini] categories returned', { intent: trimmed, categories });
+        console.log(`\n[Gemini categories] intent: "${trimmed}"\n→`, categories, '\n');
+        return categories;
+      }
       logger.warn('Gemini returned no categories; using local fallback');
     } catch (err) {
       logger.warn('Gemini call failed; using local fallback', {
@@ -150,5 +207,7 @@ export async function generateCategoriesForIntent(intent: string): Promise<strin
     }
   }
 
-  return localCategoryMatch(trimmed);
+  const fallback = localCategoryMatch(trimmed);
+  console.log(`\n[Fallback categories] intent: "${trimmed}"\n→`, fallback, '\n');
+  return fallback;
 }
