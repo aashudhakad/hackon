@@ -13,14 +13,17 @@ import { Order, Product } from '../types/domain';
 const memoryOrders = new Map<string, Order>();
 
 export const orderRepository = {
-  async create(items: Product[], total: number, paymentMethod?: string): Promise<Order> {
+  async create(items: Product[], total: number, paymentMethod?: string, userId?: string): Promise<Order> {
+    const currency = items[0]?.currency || 'INR';
     const order: Order = {
       id: randomUUID(),
+      userId,
       items,
       total,
       createdAt: new Date().toISOString(),
-      status: 'confirmed',
+      status: 'processing', // Start as processing, can be updated later
       paymentMethod,
+      currency,
     };
 
     if (isMongoConnected()) {
@@ -37,6 +40,15 @@ export const orderRepository = {
       return doc ?? null;
     }
     return memoryOrders.get(id) ?? null;
+  },
+
+  async findByUserId(userId: string): Promise<Order[]> {
+    if (isMongoConnected()) {
+      return OrderModel.find({ userId }).sort({ createdAt: -1 }).lean<Order[]>().exec();
+    }
+    return Array.from(memoryOrders.values())
+      .filter((o) => o.userId === userId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   },
 
   /**

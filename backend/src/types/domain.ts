@@ -116,15 +116,17 @@ export interface CartSummary {
   currency: string;
 }
 
-export type OrderStatus = 'confirmed' | 'failed';
+export type OrderStatus = 'confirmed' | 'processing' | 'in-transit' | 'delivered' | 'failed';
 
 export interface Order {
   id: string;
+  userId?: string;
   items: Product[];
   total: number;
   createdAt: string;
   status: OrderStatus;
   paymentMethod?: string;
+  currency?: string;
 }
 
 export interface Catalog {

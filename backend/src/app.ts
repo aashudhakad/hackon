@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
+import session from 'express-session';
+import passport from './config/passport';
 import { env } from './config/env';
 import { isMongoConnected } from './config/db';
 import { apiRouter } from './routes';
@@ -29,6 +31,25 @@ export function createApp(): Application {
   app.use(compression());
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true }));
+  
+  // Session middleware for passport
+  app.use(
+    session({
+      secret: env.sessionSecret,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: env.nodeEnv === 'production',
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      },
+    }),
+  );
+  
+  // Initialize passport
+  app.use(passport.initialize());
+  app.use(passport.session());
+  
   if (env.nodeEnv !== 'test') {
     app.use(morgan('dev'));
   }

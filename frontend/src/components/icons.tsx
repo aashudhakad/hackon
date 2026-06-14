@@ -22,3 +22,17 @@ export function FlashMark({ className = '' }: { className?: string }) {
     </span>
   );
 }
+
+/** Grid icon for Quick mode. */
+export function GridIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z" />
+    </svg>
+  );
+}
