@@ -126,11 +126,42 @@ async function callGemini(intent: string): Promise<string[]> {
  * and the homepage personalization service. Throws if Gemini is unreachable.
  */
 export async function callGeminiJSON(prompt: string): Promise<unknown> {
+  return generateContentJSON([{ text: prompt }]);
+}
+
+/**
+ * Multi-modal Gemini call: sends an inline image plus a text prompt and returns
+ * parsed JSON. Reuses the same endpoint/parsing as the text path so there is a
+ * single Gemini integration seam. `imageBase64` must be raw base64 (no data:
+ * prefix). Throws if Gemini is unreachable or returns a non-2xx status.
+ */
+export async function callGeminiVisionJSON(
+  prompt: string,
+  imageBase64: string,
+  mimeType: string,
+  timeoutMs?: number,
+): Promise<unknown> {
+  return generateContentJSON(
+    [
+      { inline_data: { mime_type: mimeType, data: imageBase64 } },
+      { text: prompt },
+    ],
+    timeoutMs,
+  );
+}
+
+type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
+
+/** Posts parts to Gemini generateContent and returns the parsed JSON payload. */
+async function generateContentJSON(
+  parts: GeminiPart[],
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<unknown> {
   const url =
     `${env.gemini.baseUrl}/models/${env.gemini.model}:generateContent?key=${env.gemini.apiKey}`;
 
   const body = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    contents: [{ role: 'user', parts }],
     generationConfig: {
       temperature: 0,
       responseMimeType: 'application/json',
@@ -143,7 +174,7 @@ export async function callGeminiJSON(prompt: string): Promise<unknown> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
-    REQUEST_TIMEOUT_MS,
+    timeoutMs,
   );
 
   if (!res.ok) {

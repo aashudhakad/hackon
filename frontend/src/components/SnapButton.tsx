@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 
 const SUPPORTED = ['image/jpeg', 'image/png'];
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 5 * 1024 * 1024;
 
 interface SnapButtonProps {
   onStart: () => void;
@@ -13,7 +13,7 @@ interface SnapButtonProps {
 
 /**
  * Snap_Icon (Requirements 3.1, 3.7). Opens a file picker restricted to
- * JPEG/PNG and validates the 10 MB limit client-side before handing off.
+ * JPEG/PNG and validates the 5 MB limit client-side before handing off.
  */
 export function SnapButton({ onStart, onFile, disabled }: SnapButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -24,11 +24,11 @@ export function SnapButton({ onStart, onFile, disabled }: SnapButtonProps) {
     if (!file) return;
 
     if (!SUPPORTED.includes(file.type)) {
-      alert('Supported image formats are JPEG and PNG (max 10 MB).');
+      alert('Supported image formats are JPEG and PNG (max 5 MB).');
       return;
     }
     if (file.size > MAX_BYTES) {
-      alert('Image exceeds the 10 MB maximum size.');
+      alert('File size greater than 5 MB. Please upload a smaller image.');
       return;
     }
     onStart();

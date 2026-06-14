@@ -27,7 +27,7 @@ export function errorHandler(
       error: {
         code: oversize ? 'FILE_TOO_LARGE' : 'UPLOAD_ERROR',
         message: oversize
-          ? 'The uploaded file exceeds the 10 MB maximum size.'
+          ? 'The uploaded file is too large.'
           : `Upload error: ${err.message}`,
       },
     });

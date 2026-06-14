@@ -1,27 +1,23 @@
 import { logger } from '../config/logger';
 import { env } from '../config/env';
 import { callGeminiJSON } from './geminiClient';
-import { Product, TierName, TIER_NAMES } from '../types/domain';
+import { Product } from '../types/domain';
 
 /**
  * Second Gemini pass: RELEVANCE + RANKING.
  *
  * Given the user intent and the candidate products fetched per category
- * (slimmed to id/name/ratings/noOfRatings/price), Gemini:
- *   1. drops products that are not genuinely the item implied by the category
- *      (e.g. removes "banana sipper"/"banana phone toy" from "banana"),
- *   2. ranks the remaining relevant products best-first (smart blend of rating,
- *      popularity and price),
- *   3. composes 3 smart bundles (Budget/Balanced/Premium), one product per
- *      category per tier.
+ * (slimmed to id/name/category/mainCategory/subCategory), Gemini:
+ * 1. Drops products that are not genuinely the item implied by the category
+ * (e.g. removes "banana sipper"/"banana phone toy" from "banana").
+ * 2. Ranks the remaining relevant products based purely on semantic relevance.
  *
- * Returns null on any failure so the caller can fall back to deterministic
- * ratings-based ranking.
+ * (Flash tier generation and final rating/price-based scoring happens in the backend)
+ * * Returns null on any failure so the caller can fall back to deterministic handling.
  */
 
 export interface RankedShop {
   quick: { category: string; productIds: string[] }[];
-  flash: Record<TierName, string[]>;
 }
 
 interface SlimProduct {
@@ -30,9 +26,6 @@ interface SlimProduct {
   mainCategory: string;
   subCategory: string;
   category: string;
-  ratings: number;
-  noOfRatings: number;
-  price: number;
 }
 
 function toSlim(p: Product): SlimProduct {
@@ -42,155 +35,152 @@ function toSlim(p: Product): SlimProduct {
     mainCategory: p.mainCategory,
     subCategory: p.subCategory,
     category: p.category,
-    ratings: p.ratings,
-    noOfRatings: p.noOfRatings,
-    price: p.price,
   };
 }
 
 function buildPrompt(intent: string, candidates: Record<string, SlimProduct[]>): string {
   return [
-    'You are a STRICT two-stage product relevance engine for an intent-first quick-commerce app.',
-    'Your task is to process potentially noisy product labels and keep ONLY the products that are truly relevant.',
+    'You are a STRICT product relevance engine.',
+    '',
+    'Your ONLY responsibility is:',
+    '1. Remove irrelevant products.',
+    '2. Remove mislabeled products.',
+    '3. Rank remaining products by semantic relevance.',
     '',
     'IMPORTANT:',
-    '- The dataset may contain WRONG or MISLABELED category labels.',
-    '- Category labels are hints, not truth.',
-    '- You must first DROP irrelevant or mislabeled products.',
-    '- Only after filtering should you rank the remaining relevant products.',
-    '- Precision matters much more than recall.',
-    '- Never keep a product just because it has a high rating or many reviews.',
+    '- Category labels may be wrong.',
+    '- MainCategory may be wrong.',
+    '- SubCategory may be wrong.',
+    '- Product name is the strongest signal.',
+    '- Use common sense.',
+    '- Precision is MUCH more important than recall.',
+    '- If unsure, reject the product.',
     '',
-    `User intent: """${intent}"""`,
+    `USER INTENT: """${intent}"""`,
     '',
-    'Input products are grouped by requested category. Each product may contain:',
-    '- name',
-    '- mainCategory',
-    '- subCategory',
-    '- category',
-    '- ratings',
-    '- noOfRatings',
+    'INPUT:',
+    '- Products are grouped by categories generated in a previous step.',
+    '- Some products may be incorrectly categorized.',
+    '- Some products may contain matching keywords but belong to completely different domains.',
     '',
-    'TWO-STAGE DECISION PROCESS:',
+    'STAGE 1: STRICT RELEVANCE FILTER',
     '',
-    'STAGE 1 — LABEL SANITY CHECK + RELEVANCE FILTER',
-    'For each requested category, inspect every candidate product and decide:',
-    'A) Is this product truly the item the user needs?',
-    'B) Is the product label/category consistent with the real-world meaning?',
-    'C) Is the product from the correct use-case / department?',
+    'For EVERY candidate product ask:',
     '',
-    'Rules for Stage 1:',
-    '1. Drop products whose label is semantically wrong for the intent.',
-    '2. Drop products whose category is only keyword-matching but use-case is different.',
-    '3. Drop products from the wrong department.',
-    '4. Drop products that are adjacent, decorative, accessory, cosmetic, or unrelated.',
-    '5. If the category is noisy, trust the product name and use-case more than the label.',
-    '6. If a product could belong to the category label but not to the actual intent, reject it.',
+    '1. Is this genuinely the item a human would buy for this intent?',
+    '2. Is this product from the correct real-world use case?',
+    '3. Is this product useful for achieving the user goal?',
     '',
-    'Examples:',
-    '- If intent is food/cooking and category is turmeric:',
-    '  keep: turmeric powder, turmeric whole',
-    '  reject: turmeric soap, turmeric face wash, turmeric cream, turmeric shampoo',
-    '- If intent is food/cooking and category is onion:',
-    '  keep: fresh onion',
-    '  reject: onion hair oil, onion shampoo, onion serum',
-    '- If intent is food/cooking and category is banana:',
-    '  keep: fresh bananas',
-    '  reject: banana sipper, banana toy, banana phone',
+    'REJECT products that:',
+    '- Match only by keyword.',
+    '- Belong to another department.',
+    '- Are accessories.',
+    '- Are decorative items.',
+    '- Are cosmetics when food is expected.',
+    '- Are food when cosmetics are expected.',
+    '- Are toys, gadgets, novelty items.',
+    '- Are adjacent but not actually needed.',
     '',
-    'STAGE 2 — HUMAN-LIKE RANKING',
-    'After filtering, rank only the remaining relevant products like a human shopping assistant.',
-    'Ranking priority:',
-    '1. semantic relevance to the intent',
-    '2. correct product type / use-case',
-    '3. practical value',
-    '4. ratings',
-    '5. numberOfRatings',
-    '6. price suitability',
+    'EXAMPLES:',
     '',
-    'Never let popularity rescue a wrong product.',
-    'A wrong product with excellent ratings must still be rejected.',
+    'Intent: Make Paneer Bhurji',
+    'Category: Onion',
+    'KEEP: Fresh onion',
+    'REJECT: Onion hair oil, onion shampoo, onion serum',
     '',
-    'FLASH MODE RULES:',
-    '- Build Budget / Balanced / Premium baskets only from the filtered relevant products.',
-    '- Budget = cheapest acceptable relevant product.',
-    '- Balanced = best value relevant product.',
-    '- Premium = highest-quality relevant product.',
-    '- Do not force a category into a basket if no relevant product exists.',
+    'Intent: Cooking',
+    'Category: Turmeric',
+    'KEEP: Turmeric powder, whole turmeric',
+    'REJECT: Turmeric soap, turmeric face wash, turmeric cream',
     '',
-    'OUTPUT RULES:',
-    '- Return STRICT JSON only.',
-    '- Use only ids from the input candidates.',
-    '- Do not invent ids.',
-    '- Do not include commentary.',
-    '- Do not include explanations outside JSON.',
+    'Intent: Banana smoothie',
+    'Category: Banana',
+    'KEEP: Fresh bananas',
+    'REJECT: Banana toy, banana bottle, banana phone',
     '',
-    'OUTPUT SHAPE:',
+    'Intent: Movie night',
+    'KEEP: Chips, popcorn, soft drinks, chocolates',
+    'REJECT: TV stand, projector mount, movie posters',
+    '',
+    'Intent: Gym starter kit',
+    'KEEP: Protein powder, shaker, resistance bands',
+    'REJECT: Random snacks, unrelated supplements',
+    '',
+    'VERY IMPORTANT:',
+    'A highly rated irrelevant product must still be rejected.',
+    'Popularity NEVER overrides relevance.',
+    '',
+    'STAGE 2: HUMAN-LIKE RANKING',
+    '',
+    'After filtering, rank products within each category.',
+    '',
+    'Ranking Priority:',
+    '1. Semantic relevance',
+    '2. Correct use case',
+    '3. Human common sense',
+    '',
+    'CATEGORY PRESERVATION:',
+    '- Never remove an entire category unless every product is irrelevant.',
+    '- Keep only the strongest products.',
+    '- Prefer 3-8 products per category.',
+    '',
+    'OUTPUT:',
+    '',
+    'Return ONLY JSON.',
+    '',
     '{',
     '  "quick": [',
-    '    { "category": "category_key", "productIds": ["id1", "id2", "id3"] }',
-    '  ],',
-    '  "flash": {',
-    '    "Budget": ["id1"],',
-    '    "Balanced": ["id2"],',
-    '    "Premium": ["id3"]',
-    '  }',
+    '    {',
+    '      "category": "category_name",',
+    '      "productIds": ["id1","id2","id3"]',
+    '    }',
+    '  ]',
     '}',
     '',
-    'CATEGORY-SPECIFIC SAFETY RULE:',
-    '- If the requested intent is food, cooking, grocery, or recipe-related, keep only edible or cooking-related products.',
-    '- Reject personal care, cosmetic, grooming, bathing, medicine, toy, gadget, or accessory products even if the category label matches.',
+    'DO NOT:',
+    '- Return flash tiers.',
+    '- Return explanations.',
+    '- Return markdown.',
+    '- Return text.',
+    '- Return invalid ids.',
     '',
-    'FINAL INSTRUCTION:',
-    'Think like a strict human curator.',
-    'First remove all irrelevant/mislabeled items.',
-    'Then rank the remaining relevant items.',
-    'When in doubt, reject the product.',
+    'Think like an extremely strict human shopping curator.',
     '',
-    'Candidate products:',
-    JSON.stringify(candidates),
+    'CANDIDATE PRODUCTS:',
+    JSON.stringify(candidates)
   ].join('\n');
-}
-
-function isTier(x: string): x is TierName {
-  return (TIER_NAMES as string[]).includes(x);
 }
 
 /** Validates the raw model output against the known candidate id set. */
 function sanitize(raw: unknown, validIds: Set<string>): RankedShop | null {
   if (!raw || typeof raw !== 'object') return null;
-  const obj = raw as { quick?: unknown; flash?: unknown };
+  const obj = raw as { quick?: unknown };
 
   const quick: RankedShop['quick'] = [];
   if (Array.isArray(obj.quick)) {
     for (const row of obj.quick as { category?: unknown; productIds?: unknown }[]) {
       const category = String(row?.category ?? '').trim().toLowerCase();
       if (!category) continue;
+      
       const ids = Array.isArray(row?.productIds)
         ? (row!.productIds as unknown[])
             .map((x) => String(x))
             .filter((id) => validIds.has(id))
         : [];
+        
       // de-dupe, preserve order
       const seen = new Set<string>();
       const deduped = ids.filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
-      quick.push({ category, productIds: deduped });
-    }
-  }
-
-  const flash: Record<TierName, string[]> = { Budget: [], Balanced: [], Premium: [] };
-  if (obj.flash && typeof obj.flash === 'object') {
-    for (const [tier, ids] of Object.entries(obj.flash as Record<string, unknown>)) {
-      if (!isTier(tier) || !Array.isArray(ids)) continue;
-      const seen = new Set<string>();
-      flash[tier] = (ids as unknown[])
-        .map((x) => String(x))
-        .filter((id) => validIds.has(id) && !seen.has(id) && (seen.add(id), true));
+      
+      // Only push category if it still has relevant products left
+      if (deduped.length > 0) {
+        quick.push({ category, productIds: deduped });
+      }
     }
   }
 
   if (quick.length === 0) return null;
-  return { quick, flash };
+  return { quick };
 }
 
 export async function rankAndBundle(
@@ -201,12 +191,14 @@ export async function rankAndBundle(
 
   const validIds = new Set<string>();
   const slim: Record<string, SlimProduct[]> = {};
+  
   for (const [cat, products] of Object.entries(candidatesByCategory)) {
     slim[cat] = products.map((p) => {
       validIds.add(p.id);
       return toSlim(p);
     });
   }
+  
   if (validIds.size === 0) return null;
 
   try {

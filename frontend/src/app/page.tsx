@@ -73,28 +73,35 @@ export default function HomePage() {
   const handleVisionFile = useCallback(
     async (file: File) => {
       setError(null);
+
+      // Client-side guard: reject > 5 MB before uploading.
+      const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+      if (file.size > MAX_IMAGE_BYTES) {
+        setError('File size greater than 5 MB. Please upload a smaller image and try again.');
+        return;
+      }
+
       setLoadingMsg('Analyzing image…');
       try {
-        const { bundle, crossSell: cross } = await api.vision(file);
-        setSubmittedIntent(bundle.intent.rawText);
-        setCategories(bundle.intent.components.map((c) => c.name));
-        setCrossSell(cross);
-        setUnfulfilled(bundle.unfulfilledComponents);
-        
-        const visionRows = bundle.rows.map((row) => ({
-          ...row,
-          alternatives: row.alternatives.slice(0, 5),
-        }));
-        setRows(visionRows);
-        setTiers(bundle.tiers);
+        // 1) Gemini Vision: image -> { intent, categories }
+        const { intent, categories } = await api.imageIntent(file);
+        // 2) Reuse the SAME downstream pipeline as text/voice intents.
+        const r = await api.shop({ intent, categories });
+
+        setSubmittedIntent(intent);
+        setCategories(r.categories);
+        setCrossSell(r.crossSell);
+        setUnfulfilled(r.unfulfilledComponents);
+        setRows(r.rows);
+        setTiers(r.tiers);
         setFlashTier('Balanced');
-        
+
         if (mode === 'flash') {
-          setCart(linesFromProducts(bundle.tiers.Balanced?.items ?? []));
+          setCart(linesFromProducts(r.tiers.Balanced?.items ?? []));
         } else {
           // Pre-select one product per category
           const defaultCart: any[] = [];
-          for (const row of visionRows) {
+          for (const row of r.rows) {
             const product = row.alternatives.find((p: any) => p.id === row.selectedItemId) ?? row.alternatives[0];
             if (product && product.availability === 'in-stock') {
               defaultCart.push({ product, quantity: 1 });
@@ -102,10 +109,23 @@ export default function HomePage() {
           }
           setCart(defaultCart);
         }
-        
+
         router.push('/shop');
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : 'Image could not be processed.');
+        // Stay on the home screen and show a clear, actionable message.
+        if (err instanceof ApiError) {
+          if (err.code === 'NO_INTENT' || err.status === 422) {
+            setError('Picture not clear. Please try again with a clearer image.');
+          } else if (err.code === 'FILE_TOO_LARGE') {
+            setError('File size greater than 5 MB. Please upload a smaller image and try again.');
+          } else if (err.code === 'UNSUPPORTED_IMAGE') {
+            setError(err.message);
+          } else {
+            setError('Could not understand the image. Please try again.');
+          }
+        } else {
+          setError('Could not understand the image. Please try again.');
+        }
       } finally {
         setLoadingMsg(null);
       }

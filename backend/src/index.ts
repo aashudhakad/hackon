@@ -4,6 +4,7 @@ import { logger } from './config/logger';
 import { connectMongo, disconnectMongo } from './config/db';
 import { disconnectRedis, getRedis } from './config/redis';
 import { ensureIndexes } from './models/ensureIndexes';
+import { tempImageStore } from './services/tempImageStore';
 
 /** Server bootstrap: connect optional dependencies, then start listening. */
 async function bootstrap(): Promise<void> {
@@ -11,6 +12,9 @@ async function bootstrap(): Promise<void> {
   await connectMongo();
   await ensureIndexes();
   getRedis();
+
+  // Periodic cleanup of expired temporary image uploads (image-intent flow).
+  tempImageStore.startCleanup();
 
   const app = createApp();
   const server = app.listen(env.port, () => {

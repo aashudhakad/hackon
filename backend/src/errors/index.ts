@@ -66,7 +66,7 @@ export class NoSpeechError extends AppError {
 
 /** Unsupported image format or oversize image (Requirement 3.7). */
 export class UnsupportedImageError extends AppError {
-  constructor(message = 'Unsupported image. Supported formats are JPEG and PNG up to 10 MB.') {
+  constructor(message = 'Unsupported image. Supported formats are JPEG and PNG up to 5 MB.') {
     super(message, 400, 'UNSUPPORTED_IMAGE');
   }
 }

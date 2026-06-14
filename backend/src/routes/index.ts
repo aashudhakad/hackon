@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middlewares/asyncHandler';
 import { validateBody } from '../middlewares/validate';
-import { imageUpload, audioUpload } from '../middlewares/upload';
+import { imageUpload, audioUpload, imageIntentUpload } from '../middlewares/upload';
 import {
   bundleSchema,
   checkoutSchema,
@@ -12,6 +12,7 @@ import {
 import { generateBundle, parseIntent } from '../controllers/intentController';
 import { quickMode, flashMode, smartShop } from '../controllers/shoppingController';
 import { processVision } from '../controllers/visionController';
+import { processImageIntent } from '../controllers/imageIntentController';
 import { processAudioIntent } from '../controllers/audioIntentController';
 import { getSmartBundle, listSmartBundles } from '../controllers/smartBundleController';
 import { getCrossSell } from '../controllers/crossSellController';
@@ -70,6 +71,8 @@ apiRouter.post('/shop', validateBody(modeSchema), asyncHandler(smartShop));
 
 // Multi-modal inputs
 apiRouter.post('/vision', imageUpload.single('image'), asyncHandler(processVision));
+// Image -> shopping intent (Gemini Vision); shares the text/voice downstream pipeline.
+apiRouter.post('/image-intent', imageIntentUpload.single('image'), asyncHandler(processImageIntent));
 apiRouter.post('/audio-intent', audioUpload.single('audio'), asyncHandler(processAudioIntent));
 
 // Smart bundles

@@ -102,6 +102,12 @@ export interface ShopResponse {
   cached: boolean;
 }
 
+/** Image -> shopping intent + categories (Gemini Vision). */
+export interface ImageIntentResponse {
+  intent: string;
+  categories: string[];
+}
+
 export const api = {
   parseIntent(text: string) {
     return request<{ intent: StructuredIntent }>('/api/intent', {
@@ -191,6 +197,27 @@ export const api = {
       throw new ApiError(err?.message ?? 'Vision failed', err?.code ?? 'UNKNOWN', res.status);
     }
     return data as VisionResponse;
+  },
+
+  /**
+   * Image -> shopping intent + categories via Gemini Vision (multipart, so no
+   * JSON Content-Type). The returned categories feed the same `/api/shop`
+   * pipeline used by text/voice intents.
+   */
+  async imageIntent(file: File): Promise<ImageIntentResponse> {
+    const form = new FormData();
+    form.append('image', file);
+    const res = await fetch('/api/image-intent', { method: 'POST', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = (data as { error?: { code?: string; message?: string } }).error;
+      throw new ApiError(
+        err?.message ?? 'Image analysis failed',
+        err?.code ?? 'UNKNOWN',
+        res.status,
+      );
+    }
+    return data as ImageIntentResponse;
   },
 
   /** Audio clip -> recognized text (server fallback path). */

@@ -22,14 +22,14 @@ export function checkImageAcceptance(mimeType: string, sizeBytes: number): Image
     return {
       accepted: false,
       reason: 'format',
-      message: 'Supported image formats are JPEG and PNG (max 10 MB).',
+      message: 'Supported image formats are JPEG and PNG (max 5 MB).',
     };
   }
   if (sizeBytes > env.limits.maxImageBytes) {
     return {
       accepted: false,
       reason: 'size',
-      message: 'Image exceeds the 10 MB maximum size. Supported formats are JPEG and PNG.',
+      message: 'File size greater than 5 MB. Supported formats are JPEG and PNG.',
     };
   }
   return { accepted: true };

@@ -11,7 +11,6 @@ import {
   RequiredComponent,
   StructuredIntent,
   TierName,
-  TIER_NAMES,
 } from '../types/domain';
 
 /** Candidates fetched per category to send to the relevance ranker. */
@@ -81,45 +80,61 @@ function buildRows(
   return { rows, unfulfilled };
 }
 
-/** Builds the 3 Flash tiers from LLM output, falling back to row-based tiers. */
-function buildTiers(
-  rows: CategoryRow[],
-  byId: Map<string, Product>,
-  ranked: RankedShop | null,
-): Record<TierName, BasketTier> {
-  let baskets: { items: Product[] }[] = [];
+/** Cheapest acceptable product per category (lowest positive price). */
+function pickBudget(products: Product[]): Product {
+  const priced = products.filter((p) => p.price > 0);
+  const pool = priced.length > 0 ? priced : products;
+  return pool.slice().sort((a, b) => a.price - b.price)[0];
+}
 
-  const llmHasFlash =
-    ranked && TIER_NAMES.some((t) => (ranked.flash[t] ?? []).length > 0);
+/** Highest quality product per category (best rating, then most reviews). */
+function pickPremium(products: Product[]): Product {
+  return products
+    .slice()
+    .sort((a, b) => b.ratings - a.ratings || b.noOfRatings - a.noOfRatings || b.price - a.price)[0];
+}
 
-  if (llmHasFlash && ranked) {
-    baskets = TIER_NAMES.map((t) => ({
-      items: (ranked.flash[t] ?? []).map((id) => byId.get(id)).filter((p): p is Product => !!p),
-    }));
-  } else {
-    // Fallback: per category pick cheapest / median / dearest from its relevant set.
-    const budget: Product[] = [];
-    const balanced: Product[] = [];
-    const premium: Product[] = [];
-    for (const row of rows) {
-      if (row.alternatives.length === 0) continue;
-      const byPrice = row.alternatives.slice().sort((a, b) => a.price - b.price);
-      budget.push(byPrice[0]);
-      balanced.push(byPrice[Math.floor((byPrice.length - 1) / 2)]);
-      premium.push(byPrice[byPrice.length - 1]);
-    }
-    baskets = [{ items: budget }, { items: balanced }, { items: premium }];
+/**
+ * Best-value score: quality per rupee. Ratings are weighted by review volume
+ * (log-scaled so a 4.5★/10k-review product beats a 5★/2-review one) and
+ * divided by price so cheaper-yet-good products rank higher.
+ */
+function valueScore(p: Product): number {
+  const price = p.price > 0 ? p.price : 1;
+  return (p.ratings * Math.log10(p.noOfRatings + 10)) / price;
+}
+
+/** Best value product per category. */
+function pickBalanced(products: Product[]): Product {
+  return products.slice().sort((a, b) => valueScore(b) - valueScore(a) || b.ratings - a.ratings)[0];
+}
+
+/**
+ * Builds the 3 Flash tiers deterministically in the backend from the
+ * Gemini-filtered, relevance-ranked products held in each Quick row's
+ * `alternatives`. Gemini no longer produces flash output; it only decides
+ * which products are relevant. Per category:
+ *   - Budget:   cheapest acceptable product
+ *   - Balanced: best value product (quality per rupee)
+ *   - Premium:  highest quality product
+ */
+function buildTiers(rows: CategoryRow[]): Record<TierName, BasketTier> {
+  const budget: Product[] = [];
+  const balanced: Product[] = [];
+  const premium: Product[] = [];
+
+  for (const row of rows) {
+    const pool = row.alternatives;
+    if (pool.length === 0) continue;
+    budget.push(pickBudget(pool));
+    balanced.push(pickBalanced(pool));
+    premium.push(pickPremium(pool));
   }
 
-  // Enforce Budget <= Balanced <= Premium by total (relabel by ascending total).
-  const sorted = baskets
-    .map((b) => ({ items: b.items, total: tierTotal(b.items) }))
-    .sort((a, b) => a.total - b.total);
-
   return {
-    Budget: { tier: 'Budget', items: sorted[0].items, total: sorted[0].total },
-    Balanced: { tier: 'Balanced', items: sorted[1].items, total: sorted[1].total },
-    Premium: { tier: 'Premium', items: sorted[2].items, total: sorted[2].total },
+    Budget: { tier: 'Budget', items: budget, total: tierTotal(budget) },
+    Balanced: { tier: 'Balanced', items: balanced, total: tierTotal(balanced) },
+    Premium: { tier: 'Premium', items: premium, total: tierTotal(premium) },
   };
 }
 
@@ -136,11 +151,12 @@ async function compute(intent: string, categories: string[]): Promise<SmartShopR
     (candidatesByCat[key] ??= []).push(p);
   }
 
-  // Second Gemini pass: relevance filter + ranking + smart bundles.
+  // Second Gemini pass: strict relevance filter + semantic ranking only.
   const ranked = await rankAndBundle(intent, candidatesByCat);
 
   const { rows, unfulfilled } = buildRows(categories, candidatesByCat, byId, ranked);
-  const tiers = buildTiers(rows, byId, ranked);
+  // Flash tiers are built deterministically in the backend from the filtered rows.
+  const tiers = buildTiers(rows);
 
   // Cross-sell from the candidate pool, excluding selected items.
   const structured: StructuredIntent = {
@@ -165,8 +181,9 @@ async function compute(intent: string, categories: string[]): Promise<SmartShopR
 export const smartShopService = {
   /**
    * Full smart-shop flow for a text intent:
-   *   intent → categories (Gemini) → candidate products (indexed) →
-   *   relevance + ranking + bundles (Gemini) → Quick rows + Flash tiers.
+   *   intent → categories (Gemini #1) → candidate products (indexed) →
+   *   strict relevance filter + semantic ranking (Gemini #2) → Quick rows →
+   *   backend-built Flash tiers (Budget/Balanced/Premium).
    * Cached by normalized intent so refreshes/repeats are instant.
    */
   async shop(params: { intent?: string; categories?: string[] }): Promise<SmartShopResult> {
