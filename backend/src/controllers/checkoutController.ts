@@ -13,9 +13,14 @@ type CartItem = Product & { quantity?: number };
  * Accepts line items with optional quantities, rejects empty carts (Req 12.3),
  * computes the total over available items (Req 12.2), enforces the 30s budget
  * (Req 12.5), and records the chosen payment method.
+ * 
+ * Requires authentication - userId is extracted from JWT token.
  */
 export async function checkout(req: Request, res: Response): Promise<void> {
   const { items, paymentMethod } = req.body as { items: CartItem[]; paymentMethod?: string };
+  
+  // Extract userId from authenticated request
+  const userId = (req as any).user?.userId;
 
   const available = items.filter((p) => p.availability === 'in-stock');
   if (available.length === 0) {
@@ -25,18 +30,20 @@ export async function checkout(req: Request, res: Response): Promise<void> {
   const total = available.reduce((acc, p) => acc + p.price * (p.quantity ?? 1), 0);
 
   const order = await withTimeout(
-    orderRepository.create(available, Math.max(0, total), paymentMethod),
+    orderRepository.create(available, Math.max(0, total), paymentMethod, userId),
     env.timeouts.checkoutMs,
   );
 
   res.status(201).json({
     order: {
       id: order.id,
+      userId: order.userId,
       items: order.items,
       total: order.total,
       status: order.status,
       createdAt: order.createdAt,
       paymentMethod: order.paymentMethod,
+      currency: order.currency,
     },
   });
 }

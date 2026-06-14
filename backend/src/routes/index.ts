@@ -27,6 +27,7 @@ import { signupSchema, loginSchema } from '../controllers/authSchemas';
 import { authenticate } from '../middlewares/auth';
 import { signupRateLimit, loginRateLimit } from '../middlewares/rateLimit';
 import passport from '../config/passport';
+import { getUserOrders, getOrderById } from '../controllers/ordersController';
 
 /** Mounts all API routes under /api. */
 export const apiRouter = Router();
@@ -83,4 +84,8 @@ apiRouter.get('/homepage/full', asyncHandler(getHomepageFull));
 
 // Cross-sell + checkout
 apiRouter.post('/cross-sell', validateBody(crossSellSchema), asyncHandler(getCrossSell));
-apiRouter.post('/checkout', validateBody(checkoutSchema), asyncHandler(checkout));
+apiRouter.post('/checkout', authenticate, validateBody(checkoutSchema), asyncHandler(checkout));
+
+// Orders (protected routes)
+apiRouter.get('/orders', authenticate, asyncHandler(getUserOrders));
+apiRouter.get('/orders/:id', authenticate, asyncHandler(getOrderById));

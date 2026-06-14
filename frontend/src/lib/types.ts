@@ -71,13 +71,17 @@ export interface SmartBundle {
   preassembled: Record<TierName, BasketTier>;
 }
 
+export type OrderStatus = 'confirmed' | 'processing' | 'in-transit' | 'delivered' | 'failed';
+
 export interface Order {
   id: string;
+  userId?: string;
   items: Product[];
   total: number;
   createdAt: string;
-  status: 'confirmed' | 'failed';
+  status: OrderStatus;
   paymentMethod?: string;
+  currency?: string;
 }
 
 /** A line in the cart: a specific product plus its quantity. */

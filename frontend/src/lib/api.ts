@@ -20,7 +20,15 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: HeadersInit = { 'Content-Type': 'application/json', ...(init?.headers ?? {}) };
+  let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  
+  // Merge existing headers if any
+  if (init?.headers) {
+    const existingHeaders = new Headers(init.headers);
+    existingHeaders.forEach((value, key) => {
+      headers[key] = value;
+    });
+  }
 
   // Add JWT token if available
   if (typeof window !== 'undefined') {
@@ -197,6 +205,15 @@ export const api = {
       throw new ApiError(err?.message ?? 'Audio failed', err?.code ?? 'UNKNOWN', res.status);
     }
     return data as { recognizedText: string };
+  },
+
+  // Orders
+  getOrders() {
+    return request<{ orders: Order[] }>('/api/orders');
+  },
+
+  getOrder(id: string) {
+    return request<{ order: Order }>(`/api/orders/${encodeURIComponent(id)}`);
   },
 };
 
