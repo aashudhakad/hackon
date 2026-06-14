@@ -62,6 +62,29 @@ export const env = {
   get geminiEnabled(): boolean {
     return this.gemini.apiKey.trim().length > 0;
   },
+
+  // JWT Authentication
+  jwt: {
+    secret: process.env.JWT_SECRET ?? '',
+    expiresIn: str(process.env.JWT_EXPIRES_IN, '7d') as '7d' | '1d' | '24h' | '60m' | string,
+  },
+
+  bcryptSaltRounds: num(process.env.BCRYPT_SALT_ROUNDS, 10),
+
+  // Google OAuth
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID ?? '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+    callbackUrl: str(process.env.GOOGLE_CALLBACK_URL, 'http://localhost:4000/api/auth/google/callback'),
+  },
+
+  // Session
+  sessionSecret: str(process.env.SESSION_SECRET, 'your-session-secret-change-in-production'),
 };
+
+// Validate JWT secret at startup
+if (!env.jwt.secret || env.jwt.secret.trim().length === 0) {
+  throw new Error('JWT_SECRET environment variable is required for authentication');
+}
 
 export type Env = typeof env;

@@ -22,9 +22,40 @@ import {
   getPersonalized,
   getTrending,
 } from '../controllers/homepageController';
+import { signup, login, getProfile, googleCallback } from '../controllers/authController';
+import { signupSchema, loginSchema } from '../controllers/authSchemas';
+import { authenticate } from '../middlewares/auth';
+import { signupRateLimit, loginRateLimit } from '../middlewares/rateLimit';
+import passport from '../config/passport';
 
 /** Mounts all API routes under /api. */
 export const apiRouter = Router();
+
+// Authentication routes
+apiRouter.post(
+  '/auth/signup',
+  signupRateLimit,
+  validateBody(signupSchema),
+  asyncHandler(signup),
+);
+apiRouter.post(
+  '/auth/login',
+  loginRateLimit,
+  validateBody(loginSchema),
+  asyncHandler(login),
+);
+apiRouter.get('/auth/me', authenticate, asyncHandler(getProfile));
+
+// Google OAuth routes
+apiRouter.get(
+  '/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'], session: false }),
+);
+apiRouter.get(
+  '/auth/google/callback',
+  passport.authenticate('google', { session: false, failureRedirect: '/login' }),
+  googleCallback,
+);
 
 // Intent understanding + bundle generation
 apiRouter.post('/intent', validateBody(intentSchema), asyncHandler(parseIntent));

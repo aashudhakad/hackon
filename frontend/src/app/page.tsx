@@ -36,6 +36,7 @@ import { PaymentModal } from '@/components/PaymentModal';
 import { OrderConfirmation } from '@/components/OrderConfirmation';
 import { ModeToggle, Mode } from '@/components/ModeToggle';
 import { BoltIcon } from '@/components/icons';
+import { UserMenu } from '@/components/UserMenu';
 
 type Screen = 'hub' | 'shopping' | 'confirmed';
 
@@ -288,6 +289,11 @@ export default function HomePage() {
 
   return (
     <div className={`${themeClass} min-h-screen`}>
+      {/* User Menu - Top Right */}
+      <div className="fixed top-4 right-4 z-50">
+        <UserMenu />
+      </div>
+
       {error && (
         <div className="sticky top-0 z-30 mx-auto max-w-2xl px-4">
           <div className="mt-3 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

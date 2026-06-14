@@ -20,8 +20,18 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: HeadersInit = { 'Content-Type': 'application/json', ...(init?.headers ?? {}) };
+
+  // Add JWT token if available
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers,
     ...init,
   });
 
@@ -29,6 +39,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const err = (data as { error?: { code?: string; message?: string; rawText?: string } }).error;
+
+    // Handle 401 - token expired or invalid
+    if (res.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      // Redirect to login if not already there
+      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
+        window.location.href = '/login';
+      }
+    }
+
     throw new ApiError(
       err?.message ?? 'Request failed',
       err?.code ?? 'UNKNOWN',
@@ -176,5 +197,41 @@ export const api = {
       throw new ApiError(err?.message ?? 'Audio failed', err?.code ?? 'UNKNOWN', res.status);
     }
     return data as { recognizedText: string };
+  },
+};
+
+// Auth API
+export interface AuthResponse {
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    createdAt: string;
+  };
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  createdAt: string;
+}
+
+export const authApi = {
+  signup(email: string, password: string) {
+    return request<AuthResponse>('/api/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  },
+
+  login(email: string, password: string) {
+    return request<AuthResponse>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  },
+
+  getProfile() {
+    return request<UserProfile>('/api/auth/me');
   },
 };
