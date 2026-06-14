@@ -20,8 +20,9 @@ export function ModeToggle({ mode, onChange }: ModeToggleProps) {
         type="button"
         onClick={() => onChange('quick')}
         className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-          mode === 'quick' ? 'bg-teal-600 text-white shadow' : 'text-gray-500 hover:text-gray-700'
+          mode === 'quick' ? 'text-white shadow' : 'text-gray-500 hover:text-gray-700'
         }`}
+        style={mode === 'quick' ? { backgroundColor: 'var(--accent)' } : undefined}
       >
         Quick
       </button>

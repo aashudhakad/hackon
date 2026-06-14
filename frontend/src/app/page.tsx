@@ -221,7 +221,7 @@ export default function HomePage() {
                 <span className="text-base sm:text-lg font-extrabold uppercase tracking-wide">Flash Mode</span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-blue-600">
+              <div className="flex items-center gap-2" style={{ color: 'var(--accent)' }}>
                 <GridIcon className="h-6 w-6 sm:h-7 sm:w-7" />
                 <span className="text-base sm:text-lg font-extrabold uppercase tracking-wide">Quick Mode</span>
               </div>
