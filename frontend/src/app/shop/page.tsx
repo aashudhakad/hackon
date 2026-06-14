@@ -148,7 +148,7 @@ export default function ShopPage() {
           <ModeToggle mode={mode} onChange={switchModeShopping} />
         </div>
 
-        <p className="truncate text-xs sm:text-sm text-gray-400">Intent: {submittedIntent}</p>
+        {/* <p className="truncate text-xs sm:text-sm text-gray-400">Intent: {submittedIntent}</p> */}
 
         {unfulfilled.length > 0 && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 break-words">
@@ -168,9 +168,9 @@ export default function ShopPage() {
           />
         ) : (
           <div>
-            <h2 className="mb-3 text-sm sm:text-base font-semibold text-gray-800">
+            {/* <h2 className="mb-3 text-sm sm:text-base font-semibold text-gray-800">
               Your basket — add items with + or remove with -
-            </h2>
+            </h2> */}
             <CategoryGrid 
               rows={rows} 
               cart={cart} 
