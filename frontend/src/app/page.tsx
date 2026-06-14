@@ -71,27 +71,18 @@ export default function HomePage() {
   const [submitting, setSubmitting] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
 
-  // ---- Load shopping data for an intent in the current mode ----
-  const loadQuick = useCallback(async (intent: string, knownCategories?: string[]) => {
-    const r = await api.quickMode(knownCategories ? { categories: knownCategories } : { intent });
-    setCategories(r.categories);
-    setRows(r.rows);
-    setCrossSell((prev) => (prev.length ? prev : r.crossSell));
-    setUnfulfilled(r.unfulfilledComponents);
-    setCart(defaultLinesFromRows(r.rows));
-    return r.categories;
-  }, []);
-
-  const loadFlash = useCallback(
-    async (intent: string, knownCategories?: string[]) => {
-      const r = await api.flashMode(knownCategories ? { categories: knownCategories } : { intent });
+  // ---- Load shopping data for an intent via the single smart-shop call ----
+  const loadShop = useCallback(
+    async (intent: string, forMode: Mode) => {
+      const r = await api.shop({ intent });
       setCategories(r.categories);
+      setRows(r.rows);
       setTiers(r.tiers);
-      setCrossSell((prev) => (prev.length ? prev : r.crossSell));
+      setCrossSell(r.crossSell);
       setUnfulfilled(r.unfulfilledComponents);
       setFlashTier('Balanced');
-      setCart(linesFromProducts(r.tiers.Balanced?.items ?? []));
-      return r.categories;
+      if (forMode === 'flash') setCart(linesFromProducts(r.tiers.Balanced?.items ?? []));
+      else setCart(defaultLinesFromRows(r.rows));
     },
     [],
   );
@@ -99,14 +90,13 @@ export default function HomePage() {
   const submitIntent = useCallback(
     async (text: string) => {
       setError(null);
-      setLoadingMsg(mode === 'flash' ? 'Charging up baskets…' : 'Understanding your intent…');
+      setLoadingMsg(mode === 'flash' ? 'Finding the best picks…' : 'Finding the best picks…');
       try {
         setSubmittedIntent(text);
         setRows([]);
         setTiers(null);
         setCrossSell([]);
-        if (mode === 'flash') await loadFlash(text);
-        else await loadQuick(text);
+        await loadShop(text, mode);
         setScreen('shopping');
       } catch (err) {
         setError(err instanceof ApiError ? err.message : 'Something went wrong.');
@@ -114,7 +104,7 @@ export default function HomePage() {
         setLoadingMsg(null);
       }
     },
-    [mode, loadFlash, loadQuick],
+    [mode, loadShop],
   );
 
   const handleVisionFile = useCallback(
@@ -178,20 +168,20 @@ export default function HomePage() {
     [mode],
   );
 
-  // ---- Mode switch on the shopping screen ----
+  // ---- Mode switch on the shopping screen (no refetch — both views preloaded) ----
   const switchModeShopping = useCallback(
     async (next: Mode) => {
       if (next === mode) return;
       setError(null);
 
+      // Quick rows + Flash tiers are loaded together by /api/shop, so toggling
+      // is instant. Fall back to a fetch only if a view is somehow missing.
       if (next === 'flash') {
         if (!tiers && categories.length > 0) {
-          setLoadingMsg('Charging up baskets…');
+          setLoadingMsg('Building baskets…');
           try {
             const r = await api.flashMode({ categories });
             setTiers(r.tiers);
-            setFlashTier('Balanced');
-            setCart(linesFromProducts(r.tiers.Balanced?.items ?? []));
           } catch (err) {
             setError(err instanceof ApiError ? err.message : 'Could not build baskets.');
             setLoadingMsg(null);
@@ -199,24 +189,20 @@ export default function HomePage() {
           } finally {
             setLoadingMsg(null);
           }
-        } else if (tiers) {
-          setCart(linesFromProducts(tiers[flashTier]?.items ?? []));
         }
-      } else {
-        // Switching to Quick: ensure rows exist.
-        if (rows.length === 0 && categories.length > 0) {
-          setLoadingMsg('Loading categories…');
-          try {
-            const r = await api.quickMode({ categories });
-            setRows(r.rows);
-            setCart(defaultLinesFromRows(r.rows));
-          } catch (err) {
-            setError(err instanceof ApiError ? err.message : 'Could not load categories.');
-            setLoadingMsg(null);
-            return;
-          } finally {
-            setLoadingMsg(null);
-          }
+        setCart(linesFromProducts((tiers ?? {} as Record<TierName, BasketTier>)[flashTier]?.items ?? []));
+      } else if (rows.length === 0 && categories.length > 0) {
+        setLoadingMsg('Loading categories…');
+        try {
+          const r = await api.quickMode({ categories });
+          setRows(r.rows);
+          setCart(defaultLinesFromRows(r.rows));
+        } catch (err) {
+          setError(err instanceof ApiError ? err.message : 'Could not load categories.');
+          setLoadingMsg(null);
+          return;
+        } finally {
+          setLoadingMsg(null);
         }
       }
       setMode(next);

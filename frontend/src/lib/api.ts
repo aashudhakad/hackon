@@ -63,6 +63,16 @@ export interface FlashResponse {
   unfulfilledComponents: string[];
 }
 
+/** Combined smart-shop response: Quick rows + Flash tiers from one AI relevance pass. */
+export interface ShopResponse {
+  categories: string[];
+  rows: CategoryRow[];
+  tiers: Record<TierName, BasketTier>;
+  crossSell: Product[];
+  unfulfilledComponents: string[];
+  cached: boolean;
+}
+
 export const api = {
   parseIntent(text: string) {
     return request<{ intent: StructuredIntent }>('/api/intent', {
@@ -89,6 +99,17 @@ export const api = {
   /** Flash mode: Budget/Balanced/Premium 3-tier baskets. */
   flashMode(params: { intent?: string; categories?: string[] }) {
     return request<FlashResponse>('/api/flash', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  /**
+   * Smart shop: one call returns relevance-filtered, LLM-ranked Quick rows AND
+   * Flash tiers. Preferred over quickMode/flashMode for text intents.
+   */
+  shop(params: { intent?: string; categories?: string[] }) {
+    return request<ShopResponse>('/api/shop', {
       method: 'POST',
       body: JSON.stringify(params),
     });

@@ -3,6 +3,7 @@ import { generateCategoriesForIntent, sanitizeCategories } from '../services/gem
 import { catalogRepository } from '../repositories/catalogRepository';
 import { bundleGenerator } from '../services/bundleGenerator';
 import { crossSellEngine } from '../services/crossSellEngine';
+import { smartShopService } from '../services/smartShopService';
 import { Bundle, RequiredComponent, StructuredIntent } from '../types/domain';
 
 /** Max product alternatives per category row in Quick mode. */
@@ -82,4 +83,17 @@ export async function flashMode(req: Request, res: Response): Promise<void> {
     crossSell,
     unfulfilledComponents: bundle.unfulfilledComponents,
   });
+}
+
+/**
+ * POST /api/shop — Smart relevance-ranked shopping (single AI relevance pass).
+ *
+ * intent → categories (Gemini) → candidate products → relevance filter + rank
+ * + smart bundles (Gemini) → returns BOTH Quick rows and Flash tiers in one
+ * response, so the frontend fetches once and toggles modes with no refetch.
+ */
+export async function smartShop(req: Request, res: Response): Promise<void> {
+  const body = req.body as ModeBody;
+  const result = await smartShopService.shop(body);
+  res.json(result);
 }

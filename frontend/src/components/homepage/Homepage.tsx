@@ -3,11 +3,16 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { getGeo, tzOffsetMinutes } from '@/lib/geo';
+import { getCached, setCached } from '@/lib/clientCache';
 import { HomepageFull, HomepageIntent } from '@/lib/types';
 import { SectionHeader } from './SectionHeader';
 import { IntentCard } from './IntentCard';
 import { TrendingCard } from './TrendingCard';
 import { HomeSkeleton } from './HomeSkeleton';
+
+/** localStorage key + TTL for cached homepage data (refresh-proof). */
+const CACHE_KEY = 'aie:homepage:v1';
+const CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 interface HomepageProps {
   /** Runs a predicted/trending intent through the existing shopping flow. */
@@ -37,6 +42,14 @@ export function Homepage({ onIntent, onBundle, disabled }: HomepageProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Use cached homepage data on refresh/revisit within the TTL — no refetch.
+      const cached = getCached<HomepageFull>(CACHE_KEY, CACHE_TTL_MS);
+      if (cached) {
+        setData(cached);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(false);
       try {
@@ -46,7 +59,10 @@ export function Homepage({ onIntent, onBundle, disabled }: HomepageProps) {
           lon: geo?.lon,
           tz: tzOffsetMinutes(),
         });
-        if (!cancelled) setData(full);
+        if (!cancelled) {
+          setData(full);
+          setCached(CACHE_KEY, full);
+        }
       } catch {
         if (!cancelled) setError(true);
       } finally {

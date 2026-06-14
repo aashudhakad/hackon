@@ -10,7 +10,7 @@ import {
   modeSchema,
 } from '../controllers/schemas';
 import { generateBundle, parseIntent } from '../controllers/intentController';
-import { quickMode, flashMode } from '../controllers/shoppingController';
+import { quickMode, flashMode, smartShop } from '../controllers/shoppingController';
 import { processVision } from '../controllers/visionController';
 import { processAudioIntent } from '../controllers/audioIntentController';
 import { getSmartBundle, listSmartBundles } from '../controllers/smartBundleController';
@@ -33,6 +33,8 @@ apiRouter.post('/bundle', validateBody(bundleSchema), asyncHandler(generateBundl
 // Gemini-powered shopping modes (text intent, any language)
 apiRouter.post('/quick', validateBody(modeSchema), asyncHandler(quickMode));
 apiRouter.post('/flash', validateBody(modeSchema), asyncHandler(flashMode));
+// Smart relevance-ranked shopping (categories + relevance/ranking in one flow)
+apiRouter.post('/shop', validateBody(modeSchema), asyncHandler(smartShop));
 
 // Multi-modal inputs
 apiRouter.post('/vision', imageUpload.single('image'), asyncHandler(processVision));
