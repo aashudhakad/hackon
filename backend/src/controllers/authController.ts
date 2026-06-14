@@ -11,8 +11,8 @@ export interface AuthRequest<T = unknown> extends Request {
  * POST /api/auth/signup - Register a new user
  */
 export async function signup(req: AuthRequest<SignupInput>, res: Response): Promise<void> {
-  const { email, password } = req.body;
-  const result = await authService.signup(email, password);
+  const { email, password, username } = req.body;
+  const result = await authService.signup(email, password, username);
   res.status(201).json(result);
 }
 

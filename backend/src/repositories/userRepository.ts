@@ -2,10 +2,10 @@ import { User, IUser } from '../models/User';
 
 export class UserRepository {
   /**
-   * Create a new user with email and password (local auth).
+   * Create a new user with email, password, and username (local auth).
    */
-  async createUser(email: string, password: string): Promise<IUser> {
-    const user = new User({ email, password, authProvider: 'local' });
+  async createUser(email: string, password: string, username: string): Promise<IUser> {
+    const user = new User({ email, password, username, authProvider: 'local' });
     return user.save();
   }
 

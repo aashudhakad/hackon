@@ -41,10 +41,10 @@ export default function CartPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="mx-auto max-w-4xl px-4 py-4 flex items-center justify-between">
+        <div className="mx-auto max-w-4xl px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
           <button
             onClick={() => router.push('/')}
-            className="text-xl font-bold text-gray-900 hover:text-gray-700 transition"
+            className="text-base sm:text-xl font-bold text-gray-900 hover:text-gray-700 transition truncate"
           >
             Amazon Instant Engine
           </button>
@@ -52,23 +52,23 @@ export default function CartPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-8">
-        <div className="mb-6">
+      <main className="mx-auto max-w-4xl px-3 sm:px-4 py-6 sm:py-8">
+        <div className="mb-4 sm:mb-6">
           <button
             onClick={handleContinueShopping}
-            className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1"
+            className="text-xs sm:text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1"
           >
             ← Continue Shopping
           </button>
         </div>
 
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Shopping Cart</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 sm:mb-8">Shopping Cart</h1>
 
         {cart.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+          <div className="bg-white rounded-xl shadow-sm p-8 sm:p-12 text-center">
             <div className="mb-4">
               <svg
-                className="mx-auto h-24 w-24 text-gray-300"
+                className="mx-auto h-16 w-16 sm:h-24 sm:w-24 text-gray-300"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -81,20 +81,20 @@ export default function CartPage() {
                 />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Your cart is empty</h2>
-            <p className="text-gray-600 mb-6">Add items to your cart to get started</p>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Your cart is empty</h2>
+            <p className="text-sm sm:text-base text-gray-600 mb-6">Add items to your cart to get started</p>
             <button
               onClick={() => router.push('/')}
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+              className="inline-flex items-center px-5 sm:px-6 py-2.5 sm:py-3 bg-blue-600 text-white rounded-lg text-sm sm:text-base font-medium hover:bg-blue-700 transition"
             >
               Start Shopping
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
             {/* Cart Items */}
             <div className="lg:col-span-2">
-              <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
                 <CartSummary
                   lines={cart}
                   total={total}
@@ -108,34 +108,34 @@ export default function CartPage() {
 
             {/* Order Summary */}
             <div className="lg:col-span-1">
-              <div className="bg-white rounded-xl shadow-sm p-6 sticky top-24">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
+              <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 sticky top-20 sm:top-24">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
                 
                 <div className="space-y-3 mb-6">
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs sm:text-sm">
                     <span className="text-gray-600">Subtotal ({count} items)</span>
                     <span className="font-medium text-gray-900">{currency} {total.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs sm:text-sm">
                     <span className="text-gray-600">Shipping</span>
                     <span className="font-medium text-green-600">FREE</span>
                   </div>
                   <div className="border-t border-gray-200 pt-3 flex justify-between">
-                    <span className="text-base font-semibold text-gray-900">Total</span>
-                    <span className="text-lg font-bold text-gray-900">{currency} {total.toFixed(2)}</span>
+                    <span className="text-sm sm:text-base font-semibold text-gray-900">Total</span>
+                    <span className="text-base sm:text-lg font-bold text-gray-900">{currency} {total.toFixed(2)}</span>
                   </div>
                 </div>
 
                 <button
                   onClick={handleCheckout}
-                  className="w-full bg-blue-600 text-white rounded-lg py-3 font-medium hover:bg-blue-700 transition mb-3"
+                  className="w-full bg-blue-600 text-white rounded-lg py-2.5 sm:py-3 text-sm sm:text-base font-medium hover:bg-blue-700 transition mb-3"
                 >
                   Proceed to Checkout
                 </button>
 
                 <button
                   onClick={handleContinueShopping}
-                  className="w-full bg-gray-100 text-gray-700 rounded-lg py-3 font-medium hover:bg-gray-200 transition"
+                  className="w-full bg-gray-100 text-gray-700 rounded-lg py-2.5 sm:py-3 text-sm sm:text-base font-medium hover:bg-gray-200 transition"
                 >
                   Continue Shopping
                 </button>
@@ -147,7 +147,7 @@ export default function CartPage() {
                         resetCart();
                       }
                     }}
-                    className="w-full mt-3 text-sm text-red-600 hover:text-red-700 transition"
+                    className="w-full mt-3 text-xs sm:text-sm text-red-600 hover:text-red-700 transition"
                   >
                     Clear Cart
                   </button>

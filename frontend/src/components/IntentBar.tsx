@@ -62,11 +62,11 @@ export function IntentBar({
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <label htmlFor="intent" className="mb-3 block text-center text-2xl font-semibold sm:text-3xl">
+      <label htmlFor="intent" className="mb-2 sm:mb-3 block text-center text-xl sm:text-2xl md:text-3xl font-semibold px-2">
         What are you trying to do?
       </label>
 
-      <div className="flex items-center gap-2 rounded-2xl border border-gray-300 bg-white p-2 shadow-sm focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--accent-ring)]">
+      <div className="flex items-center gap-1 sm:gap-2 rounded-xl sm:rounded-2xl border border-gray-300 bg-white p-1.5 sm:p-2 shadow-sm focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--accent-ring)]">
         <input
           id="intent"
           type="text"
@@ -75,7 +75,7 @@ export function IntentBar({
           disabled={disabled}
           onChange={(e) => onChange(e.target.value.slice(0, MAX_CHARS))}
           placeholder={PLACEHOLDERS[placeholderIndex]}
-          className="min-w-0 flex-1 bg-transparent px-3 py-3 text-lg outline-none disabled:opacity-60"
+          className="min-w-0 flex-1 bg-transparent px-2 sm:px-3 py-2 sm:py-3 text-sm sm:text-base md:text-lg outline-none disabled:opacity-60"
           aria-label="Intent input"
         />
 
@@ -85,13 +85,13 @@ export function IntentBar({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="rounded-xl bg-[var(--accent)] px-5 py-3 font-medium text-[var(--accent-fg)] transition enabled:hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-lg sm:rounded-xl bg-[var(--accent)] px-3 sm:px-5 py-2 sm:py-3 text-sm sm:text-base font-medium text-[var(--accent-fg)] transition enabled:hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-40 whitespace-nowrap"
         >
           Go
         </button>
       </div>
 
-      <div className="mt-1 px-2 text-right text-xs text-gray-400">
+      <div className="mt-1 px-2 text-right text-[10px] sm:text-xs text-gray-400">
         {value.length}/{MAX_CHARS}
       </div>
     </form>

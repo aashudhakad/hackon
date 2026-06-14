@@ -13,6 +13,7 @@ interface SignupFormProps {
 export function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormProps) {
   const { signup } = useAuth();
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -32,6 +33,16 @@ export function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormProps) {
     setError('');
 
     // Client-side validation
+    if (username.length < 3 || username.length > 30) {
+      setError('Username must be between 3 and 30 characters');
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setError('Username can only contain letters, numbers, and underscores');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -45,7 +56,7 @@ export function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormProps) {
     setIsLoading(true);
 
     try {
-      await signup(email, password);
+      await signup(email, password, username);
       onSuccess?.();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -80,6 +91,27 @@ export function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormProps) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+            Username
+          </label>
+          <input
+            id="username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            disabled={isLoading}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            placeholder="johndoe"
+            minLength={3}
+            maxLength={30}
+            pattern="[a-zA-Z0-9_]+"
+            title="Username can only contain letters, numbers, and underscores"
+          />
+          <p className="mt-1 text-xs text-gray-500">3-30 characters, letters, numbers, and underscores only</p>
+        </div>
+
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
             Email

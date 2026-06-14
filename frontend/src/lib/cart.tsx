@@ -57,9 +57,26 @@ interface CartContextType {
   resetCart: () => void;
   saveCartState: () => void;
   restoreCartState: () => boolean;
+  clearUserCart: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
+
+// Get cart storage key for current user
+function getCartKey(): string {
+  if (typeof window === 'undefined') return 'cartState';
+  
+  const userStr = localStorage.getItem('user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      return `cartState_${user.id}`;
+    } catch {
+      return 'cartState';
+    }
+  }
+  return 'cartState_guest';
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -71,6 +88,51 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [flashTier, setFlashTier] = useState<TierName>('Balanced');
   const [crossSell, setCrossSell] = useState<Product[]>([]);
   const [unfulfilled, setUnfulfilled] = useState<string[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Track current user and clear cart when user changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const userStr = localStorage.getItem('user');
+    const userId = userStr ? JSON.parse(userStr)?.id : null;
+    
+    if (userId !== currentUserId) {
+      setCurrentUserId(userId);
+      
+      // Load cart for this user
+      const cartKey = getCartKey();
+      const saved = localStorage.getItem(cartKey);
+      
+      if (saved) {
+        try {
+          const cartState = JSON.parse(saved);
+          setCart(cartState.cart || []);
+          setMode(cartState.mode || 'quick');
+          setSubmittedIntent(cartState.submittedIntent || '');
+          setCategories(cartState.categories || []);
+          setRows(cartState.rows || []);
+          setTiers(cartState.tiers || null);
+          setFlashTier(cartState.flashTier || 'Balanced');
+          setCrossSell(cartState.crossSell || []);
+          setUnfulfilled(cartState.unfulfilled || []);
+        } catch (error) {
+          console.error('Failed to restore cart state:', error);
+        }
+      } else {
+        // Clear cart if no saved state for this user
+        setCart([]);
+        setMode('quick');
+        setSubmittedIntent('');
+        setCategories([]);
+        setRows([]);
+        setTiers(null);
+        setFlashTier('Balanced');
+        setCrossSell([]);
+        setUnfulfilled([]);
+      }
+    }
+  }, [currentUserId]);
 
   // Calculate cart metadata
   const total = cartTotal(cart);
@@ -118,8 +180,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setUnfulfilled([]);
   }, []);
 
+  // Clear cart for current user (used on logout)
+  const clearUserCart = useCallback(() => {
+    const cartKey = getCartKey();
+    localStorage.removeItem(cartKey);
+    resetCart();
+  }, [resetCart]);
+
   // Save cart state to localStorage
   const saveCartState = useCallback(() => {
+    const cartKey = getCartKey();
     const cartState = {
       cart,
       mode,
@@ -131,13 +201,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       crossSell,
       unfulfilled,
     };
-    localStorage.setItem('cartState', JSON.stringify(cartState));
+    localStorage.setItem(cartKey, JSON.stringify(cartState));
   }, [cart, mode, submittedIntent, categories, rows, tiers, flashTier, crossSell, unfulfilled]);
 
   // Restore cart state from localStorage
   const restoreCartState = useCallback(() => {
     try {
-      const saved = localStorage.getItem('cartState');
+      const cartKey = getCartKey();
+      const saved = localStorage.getItem(cartKey);
       if (saved) {
         const cartState = JSON.parse(saved);
         setCart(cartState.cart || []);
@@ -160,7 +231,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Auto-save cart state to localStorage when it changes
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     if (cart.length > 0 || submittedIntent || categories.length > 0) {
+      const cartKey = getCartKey();
       const cartState = {
         cart,
         mode,
@@ -172,30 +246,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         crossSell,
         unfulfilled,
       };
-      localStorage.setItem('cartState', JSON.stringify(cartState));
+      localStorage.setItem(cartKey, JSON.stringify(cartState));
     }
   }, [cart, mode, submittedIntent, categories, rows, tiers, flashTier, crossSell, unfulfilled]);
-
-  // Load cart state on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('cartState');
-    if (saved) {
-      try {
-        const cartState = JSON.parse(saved);
-        setCart(cartState.cart || []);
-        setMode(cartState.mode || 'quick');
-        setSubmittedIntent(cartState.submittedIntent || '');
-        setCategories(cartState.categories || []);
-        setRows(cartState.rows || []);
-        setTiers(cartState.tiers || null);
-        setFlashTier(cartState.flashTier || 'Balanced');
-        setCrossSell(cartState.crossSell || []);
-        setUnfulfilled(cartState.unfulfilled || []);
-      } catch (error) {
-        console.error('Failed to restore cart state:', error);
-      }
-    }
-  }, []); // Only run once on mount
 
   return (
     <CartContext.Provider
@@ -233,6 +286,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         resetCart,
         saveCartState,
         restoreCartState,
+        clearUserCart,
       }}
     >
       {children}

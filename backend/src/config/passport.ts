@@ -58,9 +58,22 @@ if (env.google.clientId && env.google.clientSecret) {
             return done(null, user);
           }
 
+          // Generate username from email or display name
+          const baseUsername = profile.displayName?.replace(/\s+/g, '_').toLowerCase() || 
+                               email.split('@')[0];
+          let username = baseUsername;
+          let counter = 1;
+          
+          // Ensure unique username
+          while (await User.findOne({ username })) {
+            username = `${baseUsername}${counter}`;
+            counter++;
+          }
+
           // Create new user
           user = await User.create({
             email,
+            username,
             googleId: profile.id,
             displayName: profile.displayName,
             profilePicture: profile.photos?.[0]?.value,

@@ -223,6 +223,10 @@ export interface AuthResponse {
   user: {
     id: string;
     email: string;
+    username?: string;
+    displayName?: string;
+    profilePicture?: string;
+    authProvider: string;
     createdAt: string;
   };
 }
@@ -230,14 +234,18 @@ export interface AuthResponse {
 export interface UserProfile {
   id: string;
   email: string;
+  username?: string;
+  displayName?: string;
+  profilePicture?: string;
+  authProvider: string;
   createdAt: string;
 }
 
 export const authApi = {
-  signup(email: string, password: string) {
+  signup(email: string, password: string, username: string) {
     return request<AuthResponse>('/api/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, username }),
     });
   },
 

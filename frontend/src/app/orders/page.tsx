@@ -52,10 +52,10 @@ function OrdersPageContent() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="mx-auto max-w-4xl px-4 py-4 flex items-center justify-between">
+        <div className="mx-auto max-w-4xl px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
           <button
             onClick={() => router.push('/')}
-            className="text-xl font-bold text-gray-900 hover:text-gray-700 transition"
+            className="text-base sm:text-xl font-bold text-gray-900 hover:text-gray-700 transition truncate"
           >
             Amazon Instant Engine
           </button>
@@ -63,20 +63,20 @@ function OrdersPageContent() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
+      <main className="mx-auto max-w-4xl px-3 sm:px-4 py-6 sm:py-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 sm:mb-8">My Orders</h1>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          <div className="mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
             {error}
           </div>
         )}
 
         {orders.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+          <div className="bg-white rounded-xl shadow-sm p-8 sm:p-12 text-center">
             <div className="mb-4">
               <svg
-                className="mx-auto h-24 w-24 text-gray-300"
+                className="mx-auto h-16 w-16 sm:h-24 sm:w-24 text-gray-300"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -89,17 +89,17 @@ function OrdersPageContent() {
                 />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">No orders yet</h2>
-            <p className="text-gray-600 mb-6">When you place orders, they will appear here</p>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">No orders yet</h2>
+            <p className="text-sm sm:text-base text-gray-600 mb-6">When you place orders, they will appear here</p>
             <button
               onClick={() => router.push('/')}
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+              className="inline-flex items-center px-5 sm:px-6 py-2.5 sm:py-3 bg-blue-600 text-white rounded-lg text-sm sm:text-base font-medium hover:bg-blue-700 transition"
             >
               Start Shopping
             </button>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {orders.map((order) => (
               <div
                 key={order.id}
@@ -107,36 +107,36 @@ function OrdersPageContent() {
               >
                 {/* Order Header - Clickable */}
                 <div
-                  className="p-6 cursor-pointer"
+                  className="p-4 sm:p-6 cursor-pointer"
                   onClick={() => router.push(`/orders/${order.id}`)}
                 >
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-3 sm:mb-4">
                     <div>
-                      <h3 className="font-semibold text-gray-900">Order #{order.id.slice(0, 8)}</h3>
-                      <p className="text-sm text-gray-600">
-                        Placed on {new Date(order.createdAt).toLocaleDateString()} at{' '}
-                        {new Date(order.createdAt).toLocaleTimeString()}
+                      <h3 className="text-sm sm:text-base font-semibold text-gray-900">Order #{order.id.slice(0, 8)}</h3>
+                      <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                        {new Date(order.createdAt).toLocaleDateString()} at{' '}
+                        {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-gray-900">
+                    <div className="flex items-center justify-between sm:text-right">
+                      <p className="text-base sm:text-lg font-bold text-gray-900">
                         {order.currency || 'INR'} {order.total.toFixed(2)}
                       </p>
-                      <div className="mt-1">
+                      <div className="ml-3 sm:ml-0 sm:mt-1">
                         <OrderStatusBadge status={order.status as any} />
                       </div>
                     </div>
                   </div>
                   
-                  <div className="text-sm text-gray-600">
+                  <div className="text-xs sm:text-sm text-gray-600">
                     {order.items?.length || 0} {(order.items?.length || 0) === 1 ? 'item' : 'items'}
-                    {order.paymentMethod && ` • Payment: ${order.paymentMethod}`}
+                    {order.paymentMethod && <span className="hidden sm:inline"> • Payment: {order.paymentMethod}</span>}
                   </div>
                 </div>
 
                 {/* Delivery Timer - Only for recent orders */}
                 {isRecentOrder(order) && (
-                  <div className="px-6 pb-6">
+                  <div className="px-4 sm:px-6 pb-4 sm:pb-6">
                     <DeliveryTimer 
                       orderCreatedAt={order.createdAt} 
                       deliveryMinutes={5}

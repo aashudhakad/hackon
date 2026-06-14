@@ -18,6 +18,7 @@ export interface AuthResponse {
   user: {
     id: string;
     email: string;
+    username?: string;
     displayName?: string;
     profilePicture?: string;
     authProvider: string;
@@ -29,7 +30,7 @@ class AuthService {
   /**
    * Register a new user and return JWT token.
    */
-  async signup(email: string, password: string): Promise<AuthResponse> {
+  async signup(email: string, password: string, username: string): Promise<AuthResponse> {
     // Check if user already exists
     const exists = await userRepository.emailExists(email);
     if (exists) {
@@ -38,7 +39,7 @@ class AuthService {
     }
 
     // Create user (password hashing is handled by the User model pre-save hook)
-    const user = await userRepository.createUser(email, password);
+    const user = await userRepository.createUser(email, password, username);
 
     // Generate JWT token
     const token = this.generateToken(user);
@@ -50,6 +51,7 @@ class AuthService {
       user: {
         id: user._id.toString(),
         email: user.email,
+        username: user.username,
         displayName: user.displayName,
         profilePicture: user.profilePicture,
         authProvider: user.authProvider,
@@ -89,6 +91,7 @@ class AuthService {
       user: {
         id: user._id.toString(),
         email: user.email,
+        username: user.username,
         displayName: user.displayName,
         profilePicture: user.profilePicture,
         authProvider: user.authProvider,
@@ -110,6 +113,7 @@ class AuthService {
       user: {
         id: user._id.toString(),
         email: user.email,
+        username: user.username,
         displayName: user.displayName,
         profilePicture: user.profilePicture,
         authProvider: user.authProvider,
@@ -165,6 +169,7 @@ class AuthService {
     return {
       id: user._id.toString(),
       email: user.email,
+      username: user.username,
       displayName: user.displayName,
       profilePicture: user.profilePicture,
       authProvider: user.authProvider,

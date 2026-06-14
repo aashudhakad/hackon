@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 
 export interface IUser extends Document {
   email: string;
+  username: string; // Username for display
   password?: string; // Optional now - Google users won't have password
   googleId?: string; // Google OAuth ID
   displayName?: string; // User's display name from Google
@@ -27,6 +28,13 @@ const userSchema = new Schema<IUser>(
         'Please provide a valid email address',
       ],
       index: true,
+    },
+    username: {
+      type: String,
+      required: [true, 'Username is required'],
+      trim: true,
+      minlength: [3, 'Username must be at least 3 characters'],
+      maxlength: [30, 'Username cannot exceed 30 characters'],
     },
     password: {
       type: String,
