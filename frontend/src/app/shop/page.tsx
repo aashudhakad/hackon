@@ -9,7 +9,6 @@ import { TierBaskets } from '@/components/TierBaskets';
 import { CategoryGrid } from '@/components/CategoryGrid';
 import { CrossSellStrip } from '@/components/CrossSellStrip';
 import { BoltIcon } from '@/components/icons';
-import { linesFromProducts } from '@/lib/bundle';
 import { TierName } from '@/lib/types';
 
 export default function ShopPage() {
@@ -29,10 +28,10 @@ export default function ShopPage() {
     count,
     total,
     currency,
-    setCart,
     addToCart,
     incrementItem,
     decrementItem,
+    removeItem, // ✅ ADDED: Get removeItem from useCart
     setRows,
     setTiers,
   } = useCart();
@@ -43,7 +42,6 @@ export default function ShopPage() {
 
   // Wait for cart to initialize before checking for redirect
   useEffect(() => {
-    // Small delay to let cart context load from localStorage
     const timer = setTimeout(() => {
       setIsInitialized(true);
     }, 100);
@@ -76,14 +74,11 @@ export default function ShopPage() {
             setLoadingMsg(null);
           }
         }
-        // Flash mode: replace cart with balanced tier
-        setCart(linesFromProducts((tiers ?? {})[flashTier]?.items ?? []));
       } else if (rows.length === 0 && categories.length > 0) {
         setLoadingMsg('Loading categories…');
         try {
           const r = await api.quickMode({ categories });
           setRows(r.rows);
-          // Quick mode: keep current cart (don't clear it)
         } catch (err) {
           setError(err instanceof ApiError ? err.message : 'Could not load categories.');
           setLoadingMsg(null);
@@ -94,16 +89,15 @@ export default function ShopPage() {
       }
       setMode(next);
     },
-    [mode, tiers, rows, categories, flashTier, setMode, setCart, setTiers, setRows],
+    [mode, tiers, rows, categories, setMode, setTiers, setRows],
   );
 
   const handleSelectTier = useCallback(
     (tier: TierName) => {
       if (!tiers) return;
       setFlashTier(tier);
-      setCart(linesFromProducts(tiers[tier]?.items ?? []));
     },
-    [tiers, setFlashTier, setCart],
+    [tiers, setFlashTier],
   );
 
   return (
@@ -140,8 +134,6 @@ export default function ShopPage() {
           <ModeToggle mode={mode} onChange={switchModeShopping} />
         </div>
 
-        {/* <p className="truncate text-xs sm:text-sm text-gray-400">Intent: {submittedIntent}</p> */}
-
         {unfulfilled.length > 0 && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 break-words">
             Couldn&apos;t find: {unfulfilled.map((u) => u.replace(/_/g, ' ')).join(', ')}
@@ -157,12 +149,10 @@ export default function ShopPage() {
             onAdd={addToCart}
             onIncrement={incrementItem}
             onDecrement={decrementItem}
+            onRemove={removeItem} // ✅ ADDED: Pass onRemove to TierBaskets
           />
         ) : (
           <div>
-            {/* <h2 className="mb-3 text-sm sm:text-base font-semibold text-gray-800">
-              Your basket — add items with + or remove with -
-            </h2> */}
             <CategoryGrid 
               rows={rows} 
               cart={cart} 
@@ -200,7 +190,7 @@ export default function ShopPage() {
                     View Cart
                   </button>
                   <button
-                    onClick={() => router.push('/cart')}
+                    onClick={() => router.push('/checkout')}
                     className="rounded-lg bg-[var(--accent)] px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm font-medium text-white hover:opacity-90 transition whitespace-nowrap"
                   >
                     Checkout

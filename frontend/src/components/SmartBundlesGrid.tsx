@@ -8,10 +8,25 @@ interface SmartBundlesGridProps {
   disabled?: boolean;
 }
 
-/**
- * Smart_Bundles_Grid (Requirements 1.4-1.6, 2.1). Renders up to 6 cards
- * (clamped by the backend) with their situation labels.
- */
+const getIconForBundle = (id: string, label: string) => {
+  const t = label.toLowerCase();
+  const i = id.toLowerCase();
+  
+  if (i.includes('movie') || t.includes('movie')) return '🍿';
+  if (i.includes('maggi') || t.includes('maggi') || t.includes('noodle')) return '🍜';
+  if (i.includes('workout') || t.includes('gym')) return '🏋️‍♂️';
+  if (i.includes('guest') || t.includes('host')) return '🏠';
+  if (i.includes('rain') || t.includes('weather')) return '🌧️';
+  if (i.includes('clean') || t.includes('wash') || t.includes('emergency')) return '🧹';
+  if (i.includes('breakfast') || t.includes('morning')) return '🍳';
+  if (i.includes('hangover') || t.includes('party')) return '🍋';
+  if (i.includes('period') || t.includes('cramp') || t.includes('care')) return '🌸';
+  if (i.includes('office') || t.includes('desk')) return '💻';
+  if (i.includes('recovery') || t.includes('sick')) return '💊';
+  
+  return '🛍️'; 
+};
+
 export function SmartBundlesGrid({ bundles, onSelect, disabled }: SmartBundlesGridProps) {
   if (bundles.length === 0) return null;
 
@@ -27,10 +42,19 @@ export function SmartBundlesGrid({ bundles, onSelect, disabled }: SmartBundlesGr
             type="button"
             disabled={disabled}
             onClick={() => onSelect(b.id)}
-            className="rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-[var(--accent)] hover:shadow disabled:opacity-50"
+            className="group relative flex h-28 flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-gray-200 bg-white p-3 shadow-sm transition-all duration-200 hover:border-[var(--accent)] hover:shadow-md active:scale-95 disabled:opacity-50"
           >
-            <span className="line-clamp-2 font-medium text-gray-800">{b.label}</span>
-            <span className="mt-2 block text-xs text-[var(--accent)]">Tap to load basket →</span>
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            
+            <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-gray-50 transition-transform duration-300 group-hover:scale-110 group-hover:bg-white group-hover:shadow-sm">
+              <span className="text-2xl drop-shadow-sm">
+                {getIconForBundle(b.id, b.label)}
+              </span>
+            </div>
+            
+            <span className="relative z-10 line-clamp-2 text-center text-xs font-semibold leading-tight text-gray-700 transition-colors group-hover:text-gray-900">
+              {b.label}
+            </span>
           </button>
         ))}
       </div>

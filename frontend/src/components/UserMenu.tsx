@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useCart } from '@/lib/cart';
 import { Avatar } from './ui/Avatar';
+import { LogOut, Package, User, ShoppingCart, LogIn, UserPlus, ChevronDown } from 'lucide-react';
 
 export function UserMenu() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -12,193 +13,141 @@ export function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
 
-  // Priority: displayName (Google) > username (local signup) > email prefix
-  const displayName = user?.displayName || user?.username || user?.email?.split('@')[0] || 'User';
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  const displayName = useMemo(
+    () => user?.displayName || user?.username || user?.email?.split('@')[0] || 'User',
+    [user]
+  );
+
+  useEffect(() => {
+    const onDocumentClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(target)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
+
+    document.addEventListener('mousedown', onDocumentClick);
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', onDocumentClick);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
 
   const handleLogout = () => {
-    clearUserCart(); // Clear cart on logout
+    clearUserCart();
     logout();
     setIsOpen(false);
     router.push('/');
   };
 
+  const goTo = (path: string) => {
+    setIsOpen(false);
+    router.push(path);
+  };
+
   return (
-    <>
+    <div ref={menuRef} className="relative shrink-0">
       {!isAuthenticated || !user ? (
         <div className="flex items-center gap-2">
-          {/* No cart button when not logged in */}
+          <button
+            onClick={() => router.push('/login')}
+            className="hidden rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 sm:inline-flex"
+          >
+            Login
+          </button>
+          <button
+            onClick={() => router.push('/signup')}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:px-4"
+          >
+            <UserPlus className="h-4 w-4" />
+            <span className="hidden sm:inline">Sign Up</span>
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1 sm:gap-2">
+          <button
+            onClick={() => goTo('/cart')}
+            className="relative inline-flex items-center justify-center rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900"
+            title="View Cart"
+            aria-label={`Cart (${count} items)`}
+          >
+            <ShoppingCart className="h-6 w-6" />
+            {count > 0 && (
+              <span className="absolute right-0 top-0 flex h-5 min-w-5 translate-x-1/3 -translate-y-1/3 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white">
+                {count > 9 ? '9+' : count}
+              </span>
+            )}
+          </button>
 
-          <div className="flex gap-2">
+          <button
+  ref={buttonRef}
+  onClick={() => setIsOpen((v) => !v)}
+  className="flex max-w-[320px] items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-gray-100 sm:px-3"
+>
+            <Avatar src={user.profilePicture} name={displayName} size={36} />
+            <span className="hidden max-w-[240px] truncate text-sm font-medium text-gray-700 lg:block">
+  {displayName}
+</span>
+            <ChevronDown className={`hidden h-4 w-4 text-gray-500 transition-transform sm:block ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+      )}
+
+      {isAuthenticated && user && isOpen && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+          <div className="border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <Avatar src={user.profilePicture} name={displayName} size={40} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-gray-900">{displayName}</p>
+                <p className="truncate text-xs text-gray-600">{user.email}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="py-1">
             <button
-              onClick={() => router.push('/login')}
-              className="px-3 py-2 text-sm text-gray-700 hover:text-gray-900 font-medium hidden sm:block"
+              onClick={() => goTo('/profile')}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
             >
-              Login
+              <User className="h-5 w-5 text-gray-500" />
+              My Profile
             </button>
+
             <button
-              onClick={() => router.push('/signup')}
-              className="px-3 sm:px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+              onClick={() => goTo('/orders')}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
             >
-              Sign Up
+              <Package className="h-5 w-5 text-gray-500" />
+              My Orders
+            </button>
+
+            <div className="my-1 border-t border-gray-100" />
+
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
+            >
+              <LogOut className="h-5 w-5" />
+              Logout
             </button>
           </div>
         </div>
-      ) : (
-        /* Logged in - Different layout for mobile vs desktop */
-        <>
-          {/* Mobile Layout: Stack cart below avatar */}
-          <div className="flex md:hidden flex-col items-center gap-2">
-            {/* Avatar on top */}
-            <div className="relative">
-              <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-100 transition-colors"
-                aria-label="User menu"
-              >
-                <Avatar src={user.profilePicture} name={displayName} size={36} />
-              </button>
-            </div>
-
-            {/* Cart below avatar */}
-            <button
-              onClick={() => router.push('/cart')}
-              className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
-              title="View Cart"
-              aria-label={`Cart (${count} items)`}
-            >
-              <svg
-                className="w-6 h-6 text-gray-700"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              {count > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                  {count > 9 ? '9+' : count}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {/* Desktop Layout: Side by side */}
-          <div className="hidden md:flex items-center gap-3">
-            {/* Cart Button */}
-            <button
-              onClick={() => router.push('/cart')}
-              className="relative p-2 rounded-md hover:bg-gray-100 transition-colors"
-              title="View Cart"
-              aria-label={`Cart (${count} items)`}
-            >
-              <svg
-                className="w-6 h-6 text-gray-700"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              {count > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                  {count > 9 ? '9+' : count}
-                </span>
-              )}
-            </button>
-
-            {/* User Avatar + Username */}
-            <div className="relative">
-              <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 transition-colors"
-                aria-label="User menu"
-              >
-                <Avatar src={user.profilePicture} name={displayName} size={36} />
-                <span className="text-sm font-medium text-gray-700">{displayName}</span>
-                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Dropdown Menu (shared for both mobile and desktop) */}
-          {isOpen && (
-            <>
-              {/* Backdrop */}
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setIsOpen(false)}
-              />
-              
-              {/* Menu */}
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-20 overflow-hidden">
-                {/* User Info Header */}
-                <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
-                  <div className="flex items-center gap-3">
-                    <Avatar src={user.profilePicture} name={displayName} size={40} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
-                      <p className="text-xs text-gray-600 truncate">{user.email}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Menu Items */}
-                <div className="py-1">
-                  <button
-                    onClick={() => {
-                      router.push('/profile');
-                      setIsOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                  >
-                    <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    My Profile
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      router.push('/orders');
-                      setIsOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                  >
-                    <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    My Orders
-                  </button>
-                  
-                  <div className="border-t border-gray-100 my-1"></div>
-                  
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Logout
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </>
       )}
-    </>
+    </div>
   );
 }
