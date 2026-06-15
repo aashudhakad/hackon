@@ -1,7 +1,8 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { CartLine, Product, CategoryRow, BasketTier, TierName } from './types';
+import { useAuth } from './auth';
 import {
   addLine,
   cartCount,
@@ -9,7 +10,6 @@ import {
   clearCategory,
   decLine,
   incLine,
-  linesFromProducts,
   removeLine,
   selectInCategory,
   selectedIdForCategory,
@@ -17,8 +17,8 @@ import {
 
 export type Mode = 'quick' | 'flash';
 
-interface CartContextType {
-  // Cart state
+/** Serializable shopping/cart snapshot persisted to localStorage. */
+interface PersistedCart {
   cart: CartLine[];
   mode: Mode;
   submittedIntent: string;
@@ -28,13 +28,23 @@ interface CartContextType {
   flashTier: TierName;
   crossSell: Product[];
   unfulfilled: string[];
-  
-  // Cart metadata
+}
+
+interface CartContextType {
+  cart: CartLine[];
+  mode: Mode;
+  submittedIntent: string;
+  categories: string[];
+  rows: CategoryRow[];
+  tiers: Record<TierName, BasketTier> | null;
+  flashTier: TierName;
+  crossSell: Product[];
+  unfulfilled: string[];
+
   total: number;
   count: number;
   currency: string;
-  
-  // Cart actions
+
   setCart: (cart: CartLine[]) => void;
   addToCart: (product: Product) => void;
   incrementItem: (productId: string) => void;
@@ -42,8 +52,7 @@ interface CartContextType {
   removeItem: (productId: string) => void;
   clearCart: () => void;
   toggleQuickProduct: (product: Product) => void;
-  
-  // Shopping state actions
+
   setMode: (mode: Mode) => void;
   setSubmittedIntent: (intent: string) => void;
   setCategories: (categories: string[]) => void;
@@ -52,33 +61,46 @@ interface CartContextType {
   setFlashTier: (tier: TierName) => void;
   setCrossSell: (products: Product[]) => void;
   setUnfulfilled: (unfulfilled: string[]) => void;
-  
-  // Utility
+
   resetCart: () => void;
   saveCartState: () => void;
   restoreCartState: () => boolean;
   clearUserCart: () => void;
+  /** Explicit guest→user merge. Usually unnecessary (handled automatically on auth change). Idempotent. */
+  mergeGuestCart: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// Get cart storage key for current user
-function getCartKey(): string {
-  if (typeof window === 'undefined') return 'cartState';
-  
-  const userStr = localStorage.getItem('user');
-  if (userStr) {
-    try {
-      const user = JSON.parse(userStr);
-      return `cartState_${user.id}`;
-    } catch {
-      return 'cartState';
-    }
+const GUEST_KEY = 'cartState_guest';
+
+function keyFor(userId: string | null): string {
+  return userId ? `cartState_${userId}` : GUEST_KEY;
+}
+
+function safeParse(raw: string | null): Partial<PersistedCart> | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Partial<PersistedCart>;
+  } catch {
+    return null;
   }
-  return 'cartState_guest';
+}
+
+/** Merges two cart-line lists, summing quantities for the same product id. */
+function mergeLines(a: CartLine[], b: CartLine[]): CartLine[] {
+  const map = new Map<string, CartLine>();
+  for (const line of [...a, ...b]) {
+    const existing = map.get(line.product.id);
+    if (existing) existing.quantity += line.quantity;
+    else map.set(line.product.id, { ...line });
+  }
+  return [...map.values()];
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { user, isLoading: authLoading } = useAuth();
+
   const [cart, setCart] = useState<CartLine[]>([]);
   const [mode, setMode] = useState<Mode>('quick');
   const [submittedIntent, setSubmittedIntent] = useState('');
@@ -88,109 +110,83 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [flashTier, setFlashTier] = useState<TierName>('Balanced');
   const [crossSell, setCrossSell] = useState<Product[]>([]);
   const [unfulfilled, setUnfulfilled] = useState<string[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Track current user and clear cart when user changes
+  // localStorage key the cart is currently bound to.
+  const [storageKey, setStorageKey] = useState<string>(GUEST_KEY);
+  // Persistence is gated until the first identity-driven hydration runs.
+  const hydratedRef = useRef(false);
+  // Tracks the last applied identity so we only re-bind/merge on real changes.
+  const lastIdentityRef = useRef<string | null | undefined>(undefined);
+
+  /** Applies a persisted snapshot (or resets when null) to live state. */
+  const applyState = useCallback((s: Partial<PersistedCart> | null) => {
+    setCart(s?.cart ?? []);
+    setMode(s?.mode ?? 'quick');
+    setSubmittedIntent(s?.submittedIntent ?? '');
+    setCategories(s?.categories ?? []);
+    setRows(s?.rows ?? []);
+    setTiers(s?.tiers ?? null);
+    setFlashTier(s?.flashTier ?? 'Balanced');
+    setCrossSell(s?.crossSell ?? []);
+    setUnfulfilled(s?.unfulfilled ?? []);
+  }, []);
+
+  /** Merges the guest cart into the user's stored cart, writes it, clears guest. */
+  const performMerge = useCallback((userId: string): { key: string; merged: PersistedCart } => {
+    const userKey = keyFor(userId);
+    const guest = safeParse(localStorage.getItem(GUEST_KEY));
+    const userState = safeParse(localStorage.getItem(userKey));
+
+    const mergedLines = mergeLines(userState?.cart ?? [], guest?.cart ?? []);
+    // Keep the guest's active shopping session if it has one, else the user's.
+    const guestHasSession = !!(guest && (guest.submittedIntent || (guest.rows && guest.rows.length)));
+    const session = (guestHasSession ? guest : userState ?? guest) ?? {};
+
+    const merged: PersistedCart = {
+      cart: mergedLines,
+      mode: session.mode ?? 'quick',
+      submittedIntent: session.submittedIntent ?? '',
+      categories: session.categories ?? [],
+      rows: session.rows ?? [],
+      tiers: session.tiers ?? null,
+      flashTier: session.flashTier ?? 'Balanced',
+      crossSell: session.crossSell ?? [],
+      unfulfilled: session.unfulfilled ?? [],
+    };
+
+    localStorage.setItem(userKey, JSON.stringify(merged));
+    localStorage.removeItem(GUEST_KEY);
+    return { key: userKey, merged };
+  }, []);
+
+  /**
+   * Single source of truth for cart ownership: react to auth identity changes.
+   * - Guest → user (login/signup/OAuth): merge the guest cart into the user's
+   *   cart so nothing is lost, then bind to the user's key.
+   * - User → guest (logout): bind back to the guest key.
+   * - On first load: hydrate the correct cart once auth has resolved.
+   */
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const userStr = localStorage.getItem('user');
-    const userId = userStr ? JSON.parse(userStr)?.id : null;
-    
-    if (userId !== currentUserId) {
-      setCurrentUserId(userId);
-      
-      // Load cart for this user
-      const cartKey = getCartKey();
-      const saved = localStorage.getItem(cartKey);
-      
-      if (saved) {
-        try {
-          const cartState = JSON.parse(saved);
-          setCart(cartState.cart || []);
-          setMode(cartState.mode || 'quick');
-          setSubmittedIntent(cartState.submittedIntent || '');
-          setCategories(cartState.categories || []);
-          setRows(cartState.rows || []);
-          setTiers(cartState.tiers || null);
-          setFlashTier(cartState.flashTier || 'Balanced');
-          setCrossSell(cartState.crossSell || []);
-          setUnfulfilled(cartState.unfulfilled || []);
-        } catch (error) {
-          console.error('Failed to restore cart state:', error);
-        }
-      } else {
-        // Clear cart if no saved state for this user
-        setCart([]);
-        setMode('quick');
-        setSubmittedIntent('');
-        setCategories([]);
-        setRows([]);
-        setTiers(null);
-        setFlashTier('Balanced');
-        setCrossSell([]);
-        setUnfulfilled([]);
-      }
+    if (authLoading) return; // wait until we know who the user is
+    const uid = user?.id ?? null;
+    if (hydratedRef.current && lastIdentityRef.current === uid) return;
+
+    if (uid) {
+      const { key, merged } = performMerge(uid);
+      setStorageKey(key);
+      applyState(merged);
+    } else {
+      setStorageKey(GUEST_KEY);
+      applyState(safeParse(localStorage.getItem(GUEST_KEY)));
     }
-  }, [currentUserId]);
+    lastIdentityRef.current = uid;
+    hydratedRef.current = true;
+  }, [user?.id, authLoading, performMerge, applyState]);
 
-  // Calculate cart metadata
-  const total = cartTotal(cart);
-  const count = cartCount(cart);
-  const currency = cart[0]?.product.currency ?? 'INR';
-
-  // Cart actions
-  const addToCart = useCallback((product: Product) => {
-    setCart((prev) => addLine(prev, product));
-  }, []);
-
-  const incrementItem = useCallback((productId: string) => {
-    setCart((prev) => incLine(prev, productId));
-  }, []);
-
-  const decrementItem = useCallback((productId: string) => {
-    setCart((prev) => decLine(prev, productId));
-  }, []);
-
-  const removeItem = useCallback((productId: string) => {
-    setCart((prev) => removeLine(prev, productId));
-  }, []);
-
-  const clearCart = useCallback(() => {
-    setCart([]);
-  }, []);
-
-  const toggleQuickProduct = useCallback((product: Product) => {
-    setCart((prev) =>
-      selectedIdForCategory(prev, product.component) === product.id
-        ? clearCategory(prev, product.component)
-        : selectInCategory(prev, product),
-    );
-  }, []);
-
-  const resetCart = useCallback(() => {
-    setCart([]);
-    setMode('quick');
-    setSubmittedIntent('');
-    setCategories([]);
-    setRows([]);
-    setTiers(null);
-    setFlashTier('Balanced');
-    setCrossSell([]);
-    setUnfulfilled([]);
-  }, []);
-
-  // Clear cart for current user (used on logout)
-  const clearUserCart = useCallback(() => {
-    const cartKey = getCartKey();
-    localStorage.removeItem(cartKey);
-    resetCart();
-  }, [resetCart]);
-
-  // Save cart state to localStorage
-  const saveCartState = useCallback(() => {
-    const cartKey = getCartKey();
-    const cartState = {
+  // Persist on any change — only after hydration and to the active key.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !hydratedRef.current) return;
+    const snapshot: PersistedCart = {
       cart,
       mode,
       submittedIntent,
@@ -201,59 +197,72 @@ export function CartProvider({ children }: { children: ReactNode }) {
       crossSell,
       unfulfilled,
     };
-    localStorage.setItem(cartKey, JSON.stringify(cartState));
-  }, [cart, mode, submittedIntent, categories, rows, tiers, flashTier, crossSell, unfulfilled]);
+    localStorage.setItem(storageKey, JSON.stringify(snapshot));
+  }, [cart, mode, submittedIntent, categories, rows, tiers, flashTier, crossSell, unfulfilled, storageKey]);
 
-  // Restore cart state from localStorage
-  const restoreCartState = useCallback(() => {
-    try {
-      const cartKey = getCartKey();
-      const saved = localStorage.getItem(cartKey);
-      if (saved) {
-        const cartState = JSON.parse(saved);
-        setCart(cartState.cart || []);
-        setMode(cartState.mode || 'quick');
-        setSubmittedIntent(cartState.submittedIntent || '');
-        setCategories(cartState.categories || []);
-        setRows(cartState.rows || []);
-        setTiers(cartState.tiers || null);
-        setFlashTier(cartState.flashTier || 'Balanced');
-        setCrossSell(cartState.crossSell || []);
-        setUnfulfilled(cartState.unfulfilled || []);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Failed to restore cart state:', error);
-      return false;
-    }
+  const total = cartTotal(cart);
+  const count = cartCount(cart);
+  const currency = cart[0]?.product.currency ?? 'INR';
+
+  const addToCart = useCallback((product: Product) => setCart((prev) => addLine(prev, product)), []);
+  const incrementItem = useCallback((productId: string) => setCart((prev) => incLine(prev, productId)), []);
+  const decrementItem = useCallback((productId: string) => setCart((prev) => decLine(prev, productId)), []);
+  const removeItem = useCallback((productId: string) => setCart((prev) => removeLine(prev, productId)), []);
+  const clearCart = useCallback(() => setCart([]), []);
+
+  const toggleQuickProduct = useCallback((product: Product) => {
+    setCart((prev) =>
+      selectedIdForCategory(prev, product.component) === product.id
+        ? clearCategory(prev, product.component)
+        : selectInCategory(prev, product),
+    );
   }, []);
 
-  // Auto-save cart state to localStorage when it changes
-  useEffect(() => {
+  const resetCart = useCallback(() => applyState(null), [applyState]);
+
+  // Logout helper: clears live state. The auth-change effect re-binds to guest.
+  // The user's saved cart is intentionally kept so it returns on next login.
+  const clearUserCart = useCallback(() => applyState(null), [applyState]);
+
+  // Explicit merge (kept for the public API). Idempotent: guest key is removed
+  // after merging, so repeat calls are no-ops.
+  const mergeGuestCart = useCallback(() => {
     if (typeof window === 'undefined') return;
-    
-    if (cart.length > 0 || submittedIntent || categories.length > 0) {
-      const cartKey = getCartKey();
-      const cartState = {
-        cart,
-        mode,
-        submittedIntent,
-        categories,
-        rows,
-        tiers,
-        flashTier,
-        crossSell,
-        unfulfilled,
-      };
-      localStorage.setItem(cartKey, JSON.stringify(cartState));
+    const uid = (() => {
+      try {
+        return JSON.parse(localStorage.getItem('user') || 'null')?.id ?? null;
+      } catch {
+        return null;
+      }
+    })();
+    if (!uid) return;
+    const { key, merged } = performMerge(uid);
+    hydratedRef.current = true;
+    lastIdentityRef.current = uid;
+    setStorageKey(key);
+    applyState(merged);
+  }, [performMerge, applyState]);
+
+  const saveCartState = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const snapshot: PersistedCart = {
+      cart, mode, submittedIntent, categories, rows, tiers, flashTier, crossSell, unfulfilled,
+    };
+    localStorage.setItem(storageKey, JSON.stringify(snapshot));
+  }, [cart, mode, submittedIntent, categories, rows, tiers, flashTier, crossSell, unfulfilled, storageKey]);
+
+  const restoreCartState = useCallback(() => {
+    const saved = safeParse(localStorage.getItem(storageKey));
+    if (saved) {
+      applyState(saved);
+      return true;
     }
-  }, [cart, mode, submittedIntent, categories, rows, tiers, flashTier, crossSell, unfulfilled]);
+    return false;
+  }, [storageKey, applyState]);
 
   return (
     <CartContext.Provider
       value={{
-        // State
         cart,
         mode,
         submittedIntent,
@@ -266,8 +275,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         total,
         count,
         currency,
-        
-        // Actions
         setCart,
         addToCart,
         incrementItem,
@@ -287,6 +294,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         saveCartState,
         restoreCartState,
         clearUserCart,
+        mergeGuestCart,
       }}
     >
       {children}

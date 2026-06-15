@@ -8,9 +8,10 @@ import { GoogleLoginButton } from './GoogleLoginButton';
 interface LoginFormProps {
   onSuccess?: () => void;
   onSwitchToSignup?: () => void;
+  callbackUrl?: string;
 }
 
-export function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProps) {
+export function LoginForm({ onSuccess, onSwitchToSignup, callbackUrl }: LoginFormProps) {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,7 +47,7 @@ export function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProps) {
         </div>
       )}
 
-      <GoogleLoginButton />
+      <GoogleLoginButton callbackUrl={callbackUrl} />
 
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">

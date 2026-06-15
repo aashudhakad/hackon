@@ -9,7 +9,6 @@ import { IntentBar } from '@/components/IntentBar';
 import { Homepage } from '@/components/homepage/Homepage';
 import { ModeToggle } from '@/components/ModeToggle';
 import { BoltIcon, GridIcon } from '@/components/icons';
-import { UserMenu } from '@/components/UserMenu';
 
 export default function HomePage() {
   const router = useRouter();
@@ -179,15 +178,8 @@ export default function HomePage() {
     [mode, router, setSubmittedIntent, setCategories, setRows, setTiers, setFlashTier, setCrossSell, setUnfulfilled, setCart],
   );
 
-  const themeClass = mode === 'flash' ? 'theme-flash' : 'theme-quick';
-
   return (
-    <div className={`${themeClass} min-h-screen relative`}>
-      {/* User Menu - Top Right */}
-      <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-50">
-        <UserMenu />
-      </div>
-
+    <div className="relative">
       {error && (
         <div className="sticky top-0 z-30 mx-auto max-w-2xl px-3 sm:px-4">
           <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-xl border border-red-200 bg-red-50 px-3 sm:px-4 py-3 text-sm text-red-700 gap-2">

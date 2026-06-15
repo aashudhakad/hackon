@@ -1,66 +1,86 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useCart } from '@/lib/cart';
 
-export default function AuthCallbackPage() {
+function AuthCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { loginWithToken } = useAuth();
+  const { mergeGuestCart } = useCart();
   const [error, setError] = useState('');
+  const ran = useRef(false);
 
   useEffect(() => {
+    if (ran.current) return;
+    ran.current = true;
+
     const token = searchParams.get('token');
     const errorParam = searchParams.get('error');
 
+    const fail = (msg: string) => {
+      setError(msg);
+      setTimeout(() => router.push('/login'), 2500);
+    };
+
     if (errorParam) {
-      setError('Authentication failed. Please try again.');
-      setTimeout(() => router.push('/login'), 3000);
+      fail('Authentication failed. Please try again.');
+      return;
+    }
+    if (!token) {
+      fail('No authentication token received.');
       return;
     }
 
-    if (token) {
-      // Store token and redirect
-      localStorage.setItem('auth_token', token);
-      
-      // Decode token to get user info (basic JWT decode)
+    (async () => {
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        // You could fetch full user profile here if needed
-        localStorage.setItem('user', JSON.stringify({
-          id: payload.userId,
-          email: payload.email,
-        }));
-        
-        router.push('/');
-      } catch (err) {
-        setError('Invalid token received');
-        setTimeout(() => router.push('/login'), 3000);
+        // Establish the session + load the full profile (displayName, avatar).
+        await loginWithToken(token);
+        // Carry the guest cart into the authenticated account.
+        mergeGuestCart();
+        // Return the user to where they intended to go (set before OAuth start).
+        const dest = localStorage.getItem('postLoginRedirect') || '/';
+        localStorage.removeItem('postLoginRedirect');
+        router.replace(dest);
+      } catch {
+        fail('Could not complete sign-in. Please try again.');
       }
-    } else {
-      setError('No token received');
-      setTimeout(() => router.push('/login'), 3000);
-    }
-  }, [searchParams, router]);
+    })();
+  }, [searchParams, router, loginWithToken, mergeGuestCart]);
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="text-red-600 mb-2">{error}</div>
-          <div className="text-gray-600 text-sm">Redirecting to login...</div>
+          <div className="mb-2 text-red-600">{error}</div>
+          <div className="text-sm text-gray-600">Redirecting to login…</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <div className="text-gray-600">Completing authentication...</div>
+        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-accent" />
+        <div className="text-gray-600">Completing sign-in…</div>
       </div>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="text-gray-600">Loading…</div>
+        </div>
+      }
+    >
+      <AuthCallbackInner />
+    </Suspense>
   );
 }

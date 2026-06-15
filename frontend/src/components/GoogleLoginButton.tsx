@@ -1,9 +1,19 @@
 'use client';
 
-export function GoogleLoginButton() {
+interface GoogleLoginButtonProps {
+  /** Where to return the user after a successful Google login. */
+  callbackUrl?: string;
+}
+
+export function GoogleLoginButton({ callbackUrl }: GoogleLoginButtonProps) {
   const handleGoogleLogin = () => {
-    // Redirect to backend Google OAuth endpoint
-    window.location.href = 'http://localhost:4000/api/auth/google';
+    // Google OAuth round-trips through the backend, so the intended destination
+    // can't ride along as a query param. Stash it; /auth/callback reads it back.
+    if (callbackUrl) {
+      localStorage.setItem('postLoginRedirect', callbackUrl);
+    }
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+    window.location.href = `${base}/api/auth/google`;
   };
 
   return (

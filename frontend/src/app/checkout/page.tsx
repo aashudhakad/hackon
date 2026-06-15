@@ -7,7 +7,6 @@ import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { PaymentModal } from '@/components/PaymentModal';
-import { UserMenu } from '@/components/UserMenu';
 import { ProductImage } from '@/components/ProductImage';
 import { toCheckoutItems } from '@/lib/bundle';
 import { PaymentMethod } from '@/lib/types';
@@ -21,6 +20,7 @@ function CheckoutPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false); // Fix: Success flag to prevent race condition redirect
 
   // Wait for cart to initialize before checking for redirect
   useEffect(() => {
@@ -42,7 +42,11 @@ function CheckoutPageContent() {
       
       try {
         const { order } = await api.checkout(toCheckoutItems(cart), method.label);
+        
+        // Fix: Set success to true BEFORE clearing the cart so the useEffect doesn't kick us out
+        setIsSuccess(true); 
         resetCart();
+        
         router.push(`/orders/${order.id}`);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : 'Order was not placed.');
@@ -53,12 +57,12 @@ function CheckoutPageContent() {
     [cart, resetCart, router],
   );
 
-  // Redirect if cart is empty (only after initialization)
+  // Redirect if cart is empty (only after initialization AND if an order wasn't just successfully placed)
   useEffect(() => {
-    if (isInitialized && cart.length === 0) {
+    if (isInitialized && cart.length === 0 && !isSuccess) {
       router.push('/cart');
     }
-  }, [isInitialized, cart.length, router]);
+  }, [isInitialized, cart.length, router, isSuccess]);
 
   // Show loading while initializing
   if (!isInitialized) {
@@ -74,19 +78,6 @@ function CheckoutPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="mx-auto max-w-4xl px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <button
-            onClick={() => router.push('/')}
-            className="text-base sm:text-xl font-bold text-gray-900 hover:text-gray-700 transition truncate"
-          >
-            Amazon Instant Engine
-          </button>
-          <UserMenu />
-        </div>
-      </header>
-
       <main className="mx-auto max-w-4xl px-3 sm:px-4 py-6 sm:py-8">
         <div className="mb-4 sm:mb-6">
           <button
@@ -197,7 +188,7 @@ function CheckoutPageContent() {
 
 export default function CheckoutPage() {
   return (
-    <ProtectedRoute redirectTo="/login?redirect=checkout">
+    <ProtectedRoute redirectTo="/login?callbackUrl=/checkout">
       <CheckoutPageContent />
     </ProtectedRoute>
   );

@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { UserMenu } from '@/components/UserMenu';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { DeliveryTimer } from '@/components/DeliveryTimer';
 import { Order } from '@/lib/types';
@@ -50,19 +49,6 @@ function OrdersPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="mx-auto max-w-4xl px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <button
-            onClick={() => router.push('/')}
-            className="text-base sm:text-xl font-bold text-gray-900 hover:text-gray-700 transition truncate"
-          >
-            Amazon Instant Engine
-          </button>
-          <UserMenu />
-        </div>
-      </header>
-
       <main className="mx-auto max-w-4xl px-3 sm:px-4 py-6 sm:py-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 sm:mb-8">My Orders</h1>
 

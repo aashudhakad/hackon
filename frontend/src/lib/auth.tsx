@@ -9,6 +9,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, username: string) => Promise<void>;
+  /** Establishes a session from a JWT (Google OAuth callback) and loads the full profile. */
+  loginWithToken: (token: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -51,6 +53,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     handleAuthResponse(response);
   };
 
+  /**
+   * Establishes a session from a JWT (e.g. the Google OAuth callback). Stores
+   * the token, then fetches the full profile (which includes displayName and
+   * profilePicture) so the UI can greet the user and show their avatar.
+   */
+  const loginWithToken = async (token: string) => {
+    localStorage.setItem('auth_token', token);
+    const profile = await authApi.getProfile();
+    localStorage.setItem('user', JSON.stringify(profile));
+    setUser(profile);
+  };
+
   const logout = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
@@ -65,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         login,
         signup,
+        loginWithToken,
         logout,
       }}
     >

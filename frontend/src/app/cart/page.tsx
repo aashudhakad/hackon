@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
 import { CartSummary } from '@/components/CartSummary';
-import { UserMenu } from '@/components/UserMenu';
+import { Button } from '@/components/ui/Button';
 
 export default function CartPage() {
   const router = useRouter();
@@ -22,8 +22,9 @@ export default function CartPage() {
 
   const handleCheckout = () => {
     if (!isAuthenticated) {
-      // Save context and redirect to login
-      router.push('/login?redirect=checkout');
+      // Auth intercept: send guests to login, return them to checkout after.
+      // Their guest cart is preserved in localStorage and merged on login.
+      router.push('/login?callbackUrl=/checkout');
       return;
     }
     router.push('/checkout');
@@ -39,19 +40,6 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="mx-auto max-w-4xl px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <button
-            onClick={() => router.push('/')}
-            className="text-base sm:text-xl font-bold text-gray-900 hover:text-gray-700 transition truncate"
-          >
-            Amazon Instant Engine
-          </button>
-          <UserMenu />
-        </div>
-      </header>
-
       <main className="mx-auto max-w-4xl px-3 sm:px-4 py-6 sm:py-8">
         <div className="mb-4 sm:mb-6">
           <button
@@ -83,12 +71,7 @@ export default function CartPage() {
             </div>
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Your cart is empty</h2>
             <p className="text-sm sm:text-base text-gray-600 mb-6">Add items to your cart to get started</p>
-            <button
-              onClick={() => router.push('/')}
-              className="inline-flex items-center px-5 sm:px-6 py-2.5 sm:py-3 bg-blue-600 text-white rounded-lg text-sm sm:text-base font-medium hover:bg-blue-700 transition"
-            >
-              Start Shopping
-            </button>
+            <Button onClick={() => router.push('/')} size="lg">Start Shopping</Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -126,19 +109,13 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                <button
-                  onClick={handleCheckout}
-                  className="w-full bg-blue-600 text-white rounded-lg py-2.5 sm:py-3 text-sm sm:text-base font-medium hover:bg-blue-700 transition mb-3"
-                >
+                <Button onClick={handleCheckout} fullWidth size="lg" className="mb-3">
                   Proceed to Checkout
-                </button>
+                </Button>
 
-                <button
-                  onClick={handleContinueShopping}
-                  className="w-full bg-gray-100 text-gray-700 rounded-lg py-2.5 sm:py-3 text-sm sm:text-base font-medium hover:bg-gray-200 transition"
-                >
+                <Button onClick={handleContinueShopping} variant="secondary" fullWidth size="lg">
                   Continue Shopping
-                </button>
+                </Button>
 
                 {cart.length > 0 && (
                   <button
