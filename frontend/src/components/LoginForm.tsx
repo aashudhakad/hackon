@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
-import { GoogleLoginButton } from './GoogleLoginButton';
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -46,17 +45,6 @@ export function LoginForm({ onSuccess, onSwitchToSignup, callbackUrl }: LoginFor
           {error}
         </div>
       )}
-
-      <GoogleLoginButton callbackUrl={callbackUrl} />
-
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300"></div>
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-white text-gray-500">Or continue with email</span>
-        </div>
-      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
